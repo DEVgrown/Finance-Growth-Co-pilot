@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load Environment variables .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core'
 ]
 
 MIDDLEWARE = [
@@ -74,8 +80,15 @@ WSGI_APPLICATION = 'FG_copilot.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'neondb'),
+        'USER': os.getenv('DB_USER', 'neondb_owner'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'npg_lwhI1pGjkDQ0'),
+        'HOST': os.getenv('DB_HOST', 'ep-rapid-cake-adbchjjz-pooler.c-2.us-east-1.aws.neon.tech'),
+        'PORT': os.getenv('DB_PORT', '5432'),
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
     }
 }
 
