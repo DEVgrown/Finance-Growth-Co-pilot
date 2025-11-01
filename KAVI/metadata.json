@@ -1,0 +1,7 @@
+{
+  "name": "Copy of KAVI: Kenyan AI Voice Interface",
+  "description": "KAVI is Kenya's first multilingual, culturally-aware AI companion that participates in conversations, activated by a wake word. It blends English, Swahili, and Sheng for natural interaction.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

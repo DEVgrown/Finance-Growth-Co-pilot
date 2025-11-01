@@ -140,3 +140,5 @@ export const generateInvoicePDF = async (invoice, business) => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+

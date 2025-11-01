@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from .models import (
@@ -34,7 +35,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            # Return empty list for demo mode
+            return Transaction.objects.none()
         return Transaction.objects.filter(user=self.request.user).order_by('-transaction_date')
+    
+    def get_permissions(self):
+        # Allow list access for unauthenticated users (demo mode)
+        if self.action == 'list':
+            return [AllowAny()]
+        return super().get_permissions()
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -158,7 +168,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            # Return empty list for demo mode
+            return Invoice.objects.none()
         return Invoice.objects.filter(user=self.request.user).order_by('-issue_date')
+    
+    def get_permissions(self):
+        # Allow list access for unauthenticated users (demo mode)
+        if self.action == 'list':
+            return [AllowAny()]
+        return super().get_permissions()
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

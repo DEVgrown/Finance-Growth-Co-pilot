@@ -4,6 +4,7 @@ from django.utils.timezone import now
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.contrib.auth.models import User
 from .models import Business, UserProfile
 from .serializers import BusinessSerializer, UserSerializer, RegisterSerializer, UserProfileSerializer, UserProfileUpdateSerializer
@@ -22,7 +23,16 @@ class BusinessViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            # Return empty list for demo mode
+            return Business.objects.none()
         return Business.objects.filter(owner=self.request.user).order_by('-created_at')
+    
+    def get_permissions(self):
+        # Allow list access for unauthenticated users (demo mode)
+        if self.action == 'list':
+            return [AllowAny()]
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -40,9 +50,22 @@ class BusinessViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(business).data)
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([AllowAny])  # Allow anonymous access
 def me(request):
-    return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+    """Get current user or return demo user if not authenticated"""
+    if request.user.is_authenticated:
+        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+    else:
+        # Return demo user data for unauthenticated requests
+        return Response({
+            'id': None,
+            'username': 'demo_user',
+            'email': 'demo@example.com',
+            'first_name': 'Demo',
+            'last_name': 'User',
+            'full_name': 'Demo User',
+            'is_authenticated': False
+        }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

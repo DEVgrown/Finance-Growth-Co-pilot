@@ -97,3 +97,5 @@ export default function SupplierList({ suppliers, isLoading, onEdit, onDelete })
     </Card>
   );
 }
+
+

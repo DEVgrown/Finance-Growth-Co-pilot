@@ -1,12 +1,12 @@
 # Finance Growth Co-Pilot - API Documentation
 
-## 🔌 API Overview
+##  API Overview
 
 The Finance Growth Co-Pilot provides a comprehensive REST API for SME financial management with AI-powered insights and automation capabilities.
 
 **Base URL**: `http://localhost:8000/api`
 
-## 🔐 Authentication
+##  Authentication
 
 All API endpoints (except registration and login) require JWT authentication.
 
@@ -16,7 +16,7 @@ Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
-## 📊 Financial Management APIs
+##  Financial Management APIs
 
 ### Dashboard Data
 
@@ -244,7 +244,7 @@ GET /api/finance/budgets/analytics/
 }
 ```
 
-## 🤖 AI-Powered Features
+##  AI-Powered Features
 
 ### Financial Forecasting
 
@@ -314,7 +314,7 @@ POST /api/finance/credit-scores/calculate_score/
 }
 ```
 
-## 🔄 Automation APIs
+##  Automation APIs
 
 ### M-Pesa Reconciliation
 ```http
@@ -358,7 +358,7 @@ POST /api/finance/automation/budget-alert/
 }
 ```
 
-## 📊 Market Intelligence APIs
+##  Market Intelligence APIs
 
 ### Market Analysis
 ```http
@@ -387,7 +387,7 @@ GET /api/finance/competitor-analysis/
 - `business_name`: Your business name
 - `industry`: Industry sector
 
-## 🎯 User Management APIs
+##  User Management APIs
 
 ### User Registration
 ```http
@@ -461,7 +461,7 @@ PUT /api/users/businesses/{id}/
 DELETE /api/users/businesses/{id}/
 ```
 
-## 📱 Frontend Integration
+##  Frontend Integration
 
 ### Vue.js Components
 
@@ -523,14 +523,14 @@ const createTransaction = async (transactionData) => {
 - `404`: Not Found
 - `500`: Internal Server Error
 
-## 📈 Rate Limiting
+##  Rate Limiting
 
 - **Authentication**: 5 requests per minute
 - **Financial APIs**: 100 requests per hour
 - **AI Services**: 20 requests per hour
 - **General APIs**: 1000 requests per hour
 
-## 🧪 Testing
+##  Testing
 
 ### Test Data
 Use the provided test data to verify API functionality:
@@ -561,7 +561,7 @@ curl -X GET http://localhost:8000/api/finance/dashboard/ \
   -H "Authorization: Bearer <access_token>"
 ```
 
-## 📚 SDKs and Libraries
+##  SDKs and Libraries
 
 ### Python SDK
 ```python
@@ -604,5 +604,3 @@ const transaction = await client.createTransaction({
 ```
 
 ---
-
-**Note**: This API documentation covers the core functionality. For advanced features like AI-powered insights and automation workflows, refer to the specific service documentation.

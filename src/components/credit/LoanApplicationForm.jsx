@@ -105,3 +105,5 @@ export default function LoanApplicationForm({ onSubmit, onCancel, isSubmitting }
     </Card>
   );
 }
+
+

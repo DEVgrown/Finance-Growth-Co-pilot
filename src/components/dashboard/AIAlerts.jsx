@@ -38,3 +38,5 @@ export default function AIAlerts({ insights }) {
     </div>
   );
 }
+
+

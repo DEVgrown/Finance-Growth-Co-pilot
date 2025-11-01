@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { createPageUrl } from "@/utils";
+import { Link, useLocation, Outlet } from "react-router-dom";
+// Direct URLs used - no need for createPageUrl
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -36,91 +36,134 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 
+// Navigation organized by category
 const navigationItems = [
+  // Main/Overview
   {
     title: "Dashboard",
-    url: createPageUrl("Dashboard"),
+    url: "/dashboard",
     icon: LayoutDashboard,
-    color: "text-blue-600"
+    color: "text-blue-600",
+    category: "main"
   },
   {
-    title: "ElevenLabs",
-    url: createPageUrl("ElevenLabs"),
+    title: "AI Voice Assistant",
+    url: "/voice-assistant",
     icon: Sparkles,
     color: "text-purple-600",
-    badge: "AI"
+    badge: "KAVI",
+    category: "ai",
+    highlight: true
   },
-  {
-    title: "Proactive Alerts",
-    url: createPageUrl("ProactiveAlerts"),
-    icon: AlertCircle,
-    color: "text-orange-600"
-  },
+  
+  // Financial Management
   {
     title: "Transactions",
-    url: createPageUrl("Transactions"),
+    url: "/transactions",
     icon: ArrowLeftRight,
-    color: "text-green-600"
+    color: "text-green-600",
+    category: "financial"
   },
   {
     title: "Invoices",
-    url: createPageUrl("Invoices"),
+    url: "/invoices",
     icon: Receipt,
-    color: "text-purple-600"
+    color: "text-purple-600",
+    category: "financial"
   },
   {
     title: "Cash Flow",
-    url: createPageUrl("CashFlow"),
+    url: "/cash-flow",
     icon: TrendingUp,
-    color: "text-teal-600"
-  },
-  {
-    title: "Suppliers",
-    url: createPageUrl("Suppliers"),
-    icon: Users,
-    color: "text-orange-600"
-  },
-  {
-    title: "Customer Portal",
-    url: createPageUrl("CustomerPortal"),
-    icon: Building2,
-    color: "text-blue-500"
+    color: "text-teal-600",
+    category: "financial"
   },
   {
     title: "Credit",
-    url: createPageUrl("Credit"),
+    url: "/credit",
     icon: CreditCard,
-    color: "text-indigo-600"
+    color: "text-indigo-600",
+    category: "financial"
   },
+  
+  // People & Relationships
+  {
+    title: "Suppliers",
+    url: "/suppliers",
+    icon: Users,
+    color: "text-orange-600",
+    category: "people"
+  },
+  {
+    title: "Clients",
+    url: "/clients",
+    icon: Users,
+    color: "text-blue-500",
+    category: "people"
+  },
+  {
+    title: "Customer Portal",
+    url: "/customer-portal",
+    icon: Building2,
+    color: "text-blue-500",
+    category: "people"
+  },
+  
+  // Insights & Alerts
   {
     title: "AI Insights",
-    url: createPageUrl("Insights"),
+    url: "/insights",
     icon: Lightbulb,
-    color: "text-yellow-600"
+    color: "text-yellow-600",
+    category: "insights"
   },
   {
+    title: "Proactive Alerts",
+    url: "/proactive-alerts",
+    icon: AlertCircle,
+    color: "text-orange-600",
+    category: "insights"
+  },
+  
+  // Settings
+  {
     title: "Settings",
-    url: createPageUrl("Settings"),
+    url: "/settings",
     icon: Settings,
-    color: "text-gray-600"
+    color: "text-gray-600",
+    category: "settings"
   }
 ];
 
-export default function Layout({ children }) {
+export default function Layout() {
   const location = useLocation();
   const [user, setUser] = useState(null);
 
+  // Load user only once on mount - don't poll repeatedly
   React.useEffect(() => {
+    let mounted = true;
+    
     const loadUser = async () => {
       try {
         const userData = await base44.auth.me();
-        setUser(userData);
+        if (mounted && userData) {
+          setUser(userData);
+        }
       } catch (error) {
-        console.log("User not authenticated");
+        // Silently handle - user not authenticated is OK
+        // App can work in demo mode
+        if (mounted) {
+          setUser({ full_name: 'Demo User', email: 'demo@example.com' });
+        }
       }
     };
+    
     loadUser();
-  }, []);
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Only run once on mount
 
   const { data: insights = [] } = useQuery({
     queryKey: ['unread-insights'],
@@ -161,54 +204,237 @@ export default function Layout({ children }) {
           </SidebarHeader>
           
           <SidebarContent className="p-3">
+            {/* Main Section */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 flex items-center gap-2">
-                <Sparkles className="w-3 h-3" />
-                Navigation
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
+                Main
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navigationItems.map((item) => {
-                    const isActive = location.pathname === item.url;
-                    const Icon = item.icon;
-                    
-                    let badgeCount = 0;
-                    if (item.title === "AI Insights") badgeCount = insights.length;
-                    if (item.title === "Proactive Alerts") badgeCount = activeAlerts.filter(a => a.priority === 'critical').length;
-                    
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton 
-                          asChild 
-                          className={`
-                            hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
-                            transition-all duration-200 rounded-xl mb-1
-                            ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
-                          `}
-                        >
-                          <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
-                            <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
-                            <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
-                              {item.title}
-                            </span>
-                            {item.badge && (
-                              <Badge className="ml-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
-                                {item.badge}
-                              </Badge>
-                            )}
-                            {badgeCount > 0 && (
-                              <Badge className="ml-auto bg-red-500 text-white text-xs">
-                                {badgeCount}
-                              </Badge>
-                            )}
-                            {isActive && !item.badge && badgeCount === 0 && (
-                              <ChevronRight className="w-4 h-4 ml-auto text-green-600" />
-                            )}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  {navigationItems
+                    .filter(item => item.category === "main")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url || (item.url === "/dashboard" && location.pathname === "/");
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {isActive && <ChevronRight className="w-4 h-4 ml-auto text-green-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* AI Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 flex items-center gap-2">
+                <Sparkles className="w-3 h-3" />
+                AI Assistant
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navigationItems
+                    .filter(item => item.category === "ai")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url;
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-purple-50 to-indigo-50 shadow-sm border border-purple-200' : ''}
+                              ${item.highlight ? 'ring-2 ring-purple-300 ring-opacity-50' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {item.badge && (
+                                <Badge className="ml-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs">
+                                  {item.badge}
+                                </Badge>
+                              )}
+                              {isActive && <ChevronRight className="w-4 h-4 ml-auto text-purple-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* Financial Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
+                Financial
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navigationItems
+                    .filter(item => item.category === "financial")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url;
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {isActive && <ChevronRight className="w-4 h-4 ml-auto text-green-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* People Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
+                People
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navigationItems
+                    .filter(item => item.category === "people")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url;
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {isActive && <ChevronRight className="w-4 h-4 ml-auto text-green-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* Insights Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
+                Insights
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navigationItems
+                    .filter(item => item.category === "insights")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url;
+                      const Icon = item.icon;
+                      let badgeCount = 0;
+                      if (item.title === "AI Insights") badgeCount = insights.length;
+                      if (item.title === "Proactive Alerts") badgeCount = activeAlerts.filter(a => a.priority === 'critical').length;
+                      
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {badgeCount > 0 && (
+                                <Badge className="ml-auto bg-red-500 text-white text-xs">
+                                  {badgeCount}
+                                </Badge>
+                              )}
+                              {isActive && badgeCount === 0 && <ChevronRight className="w-4 h-4 ml-auto text-green-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* Settings Section */}
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {navigationItems
+                    .filter(item => item.category === "settings")
+                    .map((item) => {
+                      const isActive = location.pathname === item.url;
+                      const Icon = item.icon;
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            className={`
+                              hover:bg-gradient-to-r hover:from-green-50 hover:to-teal-50
+                              transition-all duration-200 rounded-xl mb-1
+                              ${isActive ? 'bg-gradient-to-r from-green-50 to-teal-50 shadow-sm' : ''}
+                            `}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                              <Icon className={`w-5 h-5 ${isActive ? item.color : 'text-gray-400'}`} />
+                              <span className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {item.title}
+                              </span>
+                              {isActive && <ChevronRight className="w-4 h-4 ml-auto text-green-600" />}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -248,11 +474,13 @@ export default function Layout({ children }) {
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto">
-            {children}
+          <div className="flex-1 overflow-auto p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+            <Outlet />
           </div>
         </main>
       </div>
     </SidebarProvider>
   );
 }
+
+

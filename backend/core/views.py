@@ -14,3 +14,25 @@ def test_cors(request):
         return response
     
     return JsonResponse({"message": "CORS test successful", "method": request.method})
+
+
+def root_view(request):
+    """Root endpoint - API information"""
+    return JsonResponse({
+        "message": "Finance Growth Co-pilot API",
+        "version": "1.0.0",
+        "endpoints": {
+            "admin": "/admin/",
+            "api": {
+                "users": "/api/users/",
+                "finance": "/api/finance/",
+                "auth": {
+                    "token": "/api/auth/token/",
+                    "refresh": "/api/auth/token/refresh/"
+                }
+            },
+            "docs": "See API_DOCUMENTATION.md for details"
+        },
+        "frontend": "http://localhost:3000",
+        "status": "running"
+    })
