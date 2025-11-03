@@ -76,6 +76,17 @@ class UserProfile(models.Model):
         default='moderate'
     )
     
+    # User Role
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            ('owner', 'Owner'),
+            ('data_entry', 'Data Entry'),
+            ('admin', 'Admin'),
+        ],
+        default='owner'
+    )
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,3 +97,54 @@ class UserProfile(models.Model):
     @property
     def full_name(self):
         return f"{self.user.first_name} {self.user.last_name}".strip()
+
+
+class Customer(models.Model):
+    """Customer/Client model for managing business clients"""
+    
+    CUSTOMER_TYPES = [
+        ('individual', 'Individual'),
+        ('business', 'Business'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('suspended', 'Suspended'),
+    ]
+    
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='customers', null=True, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='customers')
+    
+    # Customer details
+    customer_name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=20)
+    customer_type = models.CharField(max_length=20, choices=CUSTOMER_TYPES, default='individual')
+    company_name = models.CharField(max_length=255, blank=True)
+    physical_address = models.TextField(blank=True)
+    payment_terms = models.CharField(max_length=100, blank=True, default='Net 30')
+    
+    # Financial tracking
+    total_invoiced = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_paid = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    
+    # Status and metadata
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    onboarded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='onboarded_customers')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['owner', 'email']]
+    
+    def __str__(self):
+        return f"{self.customer_name} ({self.email})"
+    
+    @property
+    def outstanding_balance(self):
+        """Calculate outstanding balance"""
+        return self.total_invoiced - self.total_paid
