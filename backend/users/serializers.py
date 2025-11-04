@@ -1,7 +1,7 @@
 # backend/users/serializers.py
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Business, UserProfile
+from .models import Business, UserProfile, Customer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,7 +23,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'job_title', 'company', 'industry', 'experience_years',
             'country', 'city', 'timezone',
             'language', 'currency', 'notification_preferences',
-            'risk_tolerance',
+            'risk_tolerance', 'role',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
@@ -45,7 +45,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             'job_title', 'company', 'industry', 'experience_years',
             'country', 'city', 'timezone',
             'language', 'currency', 'notification_preferences',
-            'risk_tolerance'
+            'risk_tolerance', 'role'
         ]
     
     def update(self, instance, validated_data):
@@ -87,3 +87,36 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', '')
         )
+
+
+class CustomerSerializer(serializers.ModelSerializer):
+    """Serializer for Customer model"""
+    owner = UserSerializer(read_only=True)
+    onboarded_by = UserSerializer(read_only=True)
+    outstanding_balance = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = Customer
+        fields = [
+            'id', 'business', 'owner', 'customer_name', 'email', 'phone_number',
+            'customer_type', 'company_name', 'physical_address', 'payment_terms',
+            'total_invoiced', 'total_paid', 'outstanding_balance',
+            'status', 'onboarded_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'owner', 'onboarded_by', 'total_invoiced', 'total_paid', 'created_at', 'updated_at']
+
+
+class CustomerCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating Customer"""
+    
+    class Meta:
+        model = Customer
+        fields = [
+            'customer_name', 'email', 'phone_number', 'customer_type',
+            'company_name', 'physical_address', 'payment_terms', 'status'
+        ]
+        extra_kwargs = {
+            'customer_name': {'required': True},
+            'email': {'required': True},
+            'phone_number': {'required': True},
+        }

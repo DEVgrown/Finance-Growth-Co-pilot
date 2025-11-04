@@ -2,6 +2,8 @@ import { createBrowserRouter } from "react-router-dom";
 import Layout from "./layouts/Layout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
+import DataEntryDashboard from "./pages/DataEntryDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Insights from "./pages/Insights";
 import Transactions from "./pages/Transactions";
 import Invoices from "./pages/Invoices";
@@ -13,23 +15,36 @@ import VoiceAssistant from "./pages/VoiceAssistant";
 import ProactiveAlerts from "./pages/ProactiveAlerts";
 import CustomerPortal from "./pages/CustomerPortal";
 import Register from "./pages/Register";
+import Login from "./pages/Login";
 import ElevenLabs from "./pages/ElevenLabs";
 import Clients from "./pages/Clients";
+import RoleBasedRedirect from "./components/RoleBasedRedirect";
+import RootRedirect from "./components/RootRedirect";
 
 export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <RootRedirect />,
+    errorElement: <ErrorBoundary />
+  },
   {
     path: "/",
     element: <Layout />,
     errorElement: <ErrorBoundary />,
     children: [
       { 
-        index: true, 
+        path: "dashboard", 
         element: <Dashboard />,
         errorElement: <ErrorBoundary />
       },
       { 
-        path: "dashboard", 
-        element: <Dashboard />,
+        path: "data-entry-dashboard", 
+        element: <DataEntryDashboard />,
+        errorElement: <ErrorBoundary />
+      },
+      { 
+        path: "admin-dashboard", 
+        element: <AdminDashboard />,
         errorElement: <ErrorBoundary />
       },
       { 
@@ -98,6 +113,11 @@ export const router = createBrowserRouter([
         errorElement: <ErrorBoundary />
       }
     ]
+  },
+  {
+    path: "/login",
+    element: <Login />,
+    errorElement: <ErrorBoundary />
   }
 ], {
   future: {

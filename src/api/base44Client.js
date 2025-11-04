@@ -158,6 +158,51 @@ const makeFallback = () => {
           }
         }
       },
+      Customer: {
+        list: async (orderBy, limit) => {
+          try {
+            const params = {};
+            if (orderBy) params.ordering = orderBy;
+            if (limit) params.limit = limit;
+            return await apiClient.getCustomers(params);
+          } catch (error) {
+            console.error('Error fetching customers:', error);
+            return [];
+          }
+        },
+        create: async (data) => {
+          try {
+            return await apiClient.createCustomer(data);
+          } catch (error) {
+            console.error('Error creating customer:', error);
+            throw error;
+          }
+        },
+        get: async (id) => {
+          try {
+            return await apiClient.getCustomer(id);
+          } catch (error) {
+            console.error('Error fetching customer:', error);
+            throw error;
+          }
+        },
+        update: async (id, data) => {
+          try {
+            return await apiClient.updateCustomer(id, data);
+          } catch (error) {
+            console.error('Error updating customer:', error);
+            throw error;
+          }
+        },
+        delete: async (id) => {
+          try {
+            return await apiClient.deleteCustomer(id);
+          } catch (error) {
+            console.error('Error deleting customer:', error);
+            throw error;
+          }
+        }
+      },
       CashFlowForecast: {
         list: async (orderBy, limit) => {
           try {
@@ -223,8 +268,8 @@ const makeFallback = () => {
           return { full_name: 'Demo User', email: 'demo@example.com' };
         }
       },
-      login: async (email, password) => {
-        return await apiClient.login(email, password);
+      login: async (username, password) => {
+        return await apiClient.login(username, password);
       },
       logout: () => {
         apiClient.setToken(null);

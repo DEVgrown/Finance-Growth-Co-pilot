@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
+import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 // Direct URLs used - no need for createPageUrl
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "@/lib/apiClient";
 import {
   LayoutDashboard,
   Receipt,
@@ -36,15 +37,32 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 
-// Navigation organized by category
-const navigationItems = [
+// Navigation organized by category - will be filtered based on role
+const baseNavigationItems = [
   // Main/Overview
   {
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
     color: "text-blue-600",
-    category: "main"
+    category: "main",
+    roles: ["owner"]
+  },
+  {
+    title: "Data Entry Dashboard",
+    url: "/data-entry-dashboard",
+    icon: LayoutDashboard,
+    color: "text-blue-600",
+    category: "main",
+    roles: ["data_entry"]
+  },
+  {
+    title: "Admin Dashboard",
+    url: "/admin-dashboard",
+    icon: LayoutDashboard,
+    color: "text-red-600",
+    category: "main",
+    roles: ["admin"]
   },
   {
     title: "AI Voice Assistant",
@@ -53,7 +71,8 @@ const navigationItems = [
     color: "text-purple-600",
     badge: "KAVI",
     category: "ai",
-    highlight: true
+    highlight: true,
+    roles: ["owner", "data_entry", "admin"]
   },
   
   // Financial Management
@@ -62,28 +81,32 @@ const navigationItems = [
     url: "/transactions",
     icon: ArrowLeftRight,
     color: "text-green-600",
-    category: "financial"
+    category: "financial",
+    roles: ["owner", "data_entry", "admin"]
   },
   {
     title: "Invoices",
     url: "/invoices",
     icon: Receipt,
     color: "text-purple-600",
-    category: "financial"
+    category: "financial",
+    roles: ["owner", "data_entry", "admin"]
   },
   {
     title: "Cash Flow",
     url: "/cash-flow",
     icon: TrendingUp,
     color: "text-teal-600",
-    category: "financial"
+    category: "financial",
+    roles: ["owner", "admin"]
   },
   {
     title: "Credit",
     url: "/credit",
     icon: CreditCard,
     color: "text-indigo-600",
-    category: "financial"
+    category: "financial",
+    roles: ["owner", "admin"]
   },
   
   // People & Relationships
@@ -92,21 +115,24 @@ const navigationItems = [
     url: "/suppliers",
     icon: Users,
     color: "text-orange-600",
-    category: "people"
+    category: "people",
+    roles: ["owner", "data_entry", "admin"]
   },
   {
     title: "Clients",
     url: "/clients",
     icon: Users,
     color: "text-blue-500",
-    category: "people"
+    category: "people",
+    roles: ["owner", "data_entry", "admin"]
   },
   {
     title: "Customer Portal",
     url: "/customer-portal",
     icon: Building2,
     color: "text-blue-500",
-    category: "people"
+    category: "people",
+    roles: ["owner", "admin"]
   },
   
   // Insights & Alerts
@@ -115,14 +141,16 @@ const navigationItems = [
     url: "/insights",
     icon: Lightbulb,
     color: "text-yellow-600",
-    category: "insights"
+    category: "insights",
+    roles: ["owner", "admin"]
   },
   {
     title: "Proactive Alerts",
     url: "/proactive-alerts",
     icon: AlertCircle,
     color: "text-orange-600",
-    category: "insights"
+    category: "insights",
+    roles: ["owner", "admin"]
   },
   
   // Settings
@@ -131,13 +159,17 @@ const navigationItems = [
     url: "/settings",
     icon: Settings,
     color: "text-gray-600",
-    category: "settings"
+    category: "settings",
+    roles: ["owner", "data_entry", "admin"]
   }
 ];
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState("owner");
 
   // Load user only once on mount - don't poll repeatedly
   React.useEffect(() => {
@@ -148,6 +180,17 @@ export default function Layout() {
         const userData = await base44.auth.me();
         if (mounted && userData) {
           setUser(userData);
+          
+          // Load user profile to get role
+          try {
+            const profile = await apiClient.getUserProfile();
+            if (profile && profile.role) {
+              setUserRole(profile.role);
+            }
+          } catch (error) {
+            // Default to owner if profile not found
+            console.log("Profile not found, defaulting to owner role");
+          }
         }
       } catch (error) {
         // Silently handle - user not authenticated is OK
@@ -164,6 +207,12 @@ export default function Layout() {
       mounted = false;
     };
   }, []); // Only run once on mount
+
+  // Filter navigation items based on user role
+  const navigationItems = baseNavigationItems.filter(item => {
+    if (!item.roles || item.roles.length === 0) return true;
+    return item.roles.includes(userRole);
+  });
 
   const { data: insights = [] } = useQuery({
     queryKey: ['unread-insights'],
@@ -184,7 +233,15 @@ export default function Layout() {
   });
 
   const handleLogout = () => {
+    // Clear authentication tokens
     base44.auth.logout();
+    // Clear user state
+    setUser(null);
+    setUserRole("owner");
+    // Clear all React Query cache
+    queryClient.clear();
+    // Redirect to login page
+    navigate("/login", { replace: true });
   };
 
   return (
@@ -214,7 +271,10 @@ export default function Layout() {
                   {navigationItems
                     .filter(item => item.category === "main")
                     .map((item) => {
-                      const isActive = location.pathname === item.url || (item.url === "/dashboard" && location.pathname === "/");
+                      const isActive = location.pathname === item.url || 
+                        (item.url === "/dashboard" && (location.pathname === "/" || location.pathname === "/dashboard")) ||
+                        (item.url === "/data-entry-dashboard" && location.pathname === "/data-entry-dashboard") ||
+                        (item.url === "/admin-dashboard" && location.pathname === "/admin-dashboard");
                       const Icon = item.icon;
                       return (
                         <SidebarMenuItem key={item.title}>
