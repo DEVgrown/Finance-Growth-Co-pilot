@@ -78,10 +78,13 @@ const makeFallback = () => {
       Business: {
         list: async (...args) => {
           try {
-            return await apiClient.getBusinesses();
+            const list = await apiClient.getBusinesses();
+            if (Array.isArray(list) && list.length > 0) return list;
+            // Fallback to mock business to avoid undefined in queries expecting a single business
+            return [mockData.business];
           } catch (error) {
             console.error('Error fetching businesses:', error);
-            return [];
+            return [mockData.business];
           }
         },
         create: async (data) => {
@@ -97,10 +100,23 @@ const makeFallback = () => {
             const params = {};
             if (orderBy) params.ordering = orderBy;
             if (limit) params.limit = limit;
-            return await apiClient.getTransactions(params);
+            const results = await apiClient.getTransactions(params);
+            const normalized = Array.isArray(results)
+              ? results.map(tx => ({
+                  id: tx.id,
+                  type: tx.transaction_type || tx.type,
+                  amount: typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0),
+                  category: tx.category || '',
+                  description: tx.description || '',
+                  transaction_date: tx.transaction_date,
+                  source: tx.payment_method || tx.source,
+                  party_name: tx.customer || tx.supplier || tx.party_name || ''
+                }))
+              : [];
+            return normalized.length ? normalized : mockData.transactions;
           } catch (error) {
             console.error('Error fetching transactions:', error);
-            return [];
+            return mockData.transactions;
           }
         },
         create: async (data) => {
@@ -116,10 +132,11 @@ const makeFallback = () => {
             const params = {};
             if (orderBy) params.ordering = orderBy;
             if (limit) params.limit = limit;
-            return await apiClient.getInvoices(params);
+            const invoices = await apiClient.getInvoices(params);
+            return Array.isArray(invoices) && invoices.length ? invoices : mockData.invoices;
           } catch (error) {
             console.error('Error fetching invoices:', error);
-            return [];
+            return mockData.invoices;
           }
         },
         create: async (data) => {

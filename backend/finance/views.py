@@ -36,8 +36,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         if not self.request.user.is_authenticated:
-            # Return empty list for demo mode
-            return Transaction.objects.none()
+            # Serve demo data for unauthenticated users if seed_user exists
+            return Transaction.objects.filter(user__username='seed_user').order_by('-transaction_date')
         return Transaction.objects.filter(user=self.request.user).order_by('-transaction_date')
     
     def get_permissions(self):
@@ -169,8 +169,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         if not self.request.user.is_authenticated:
-            # Return empty list for demo mode
-            return Invoice.objects.none()
+            # Serve demo data for unauthenticated users if seed_user exists
+            return Invoice.objects.filter(user__username='seed_user').order_by('-issue_date')
         return Invoice.objects.filter(user=self.request.user).order_by('-issue_date')
     
     def get_permissions(self):

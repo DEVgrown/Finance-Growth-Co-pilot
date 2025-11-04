@@ -24,8 +24,8 @@ class BusinessViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if not self.request.user.is_authenticated:
-            # Return empty list for demo mode
-            return Business.objects.none()
+            # Serve demo data for unauthenticated users if seed_user exists
+            return Business.objects.filter(owner__username='seed_user').order_by('-created_at')
         return Business.objects.filter(owner=self.request.user).order_by('-created_at')
     
     def get_permissions(self):

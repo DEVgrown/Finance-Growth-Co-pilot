@@ -1,0 +1,123 @@
+{
+  "tech_stack": [
+    "python",
+    "django",
+    "djangorestframework",
+    "postgresql",
+    "javascript",
+    "react",
+    "vite",
+    "tailwindcss",
+    "tanstack-react-query",
+    "jwt-simplejwt"
+  ],
+  "features": [
+    {
+      "name": "User & Business Management",
+      "description": "JWT auth, user profile, business CRUD, demo-friendly /users/me endpoint.",
+      "files": [
+        "backend/users/models.py",
+        "backend/users/serializers.py",
+        "backend/users/views.py",
+        "backend/users/urls.py"
+      ]
+    },
+    {
+      "name": "Finance - Transactions",
+      "description": "Transaction API with analytics and summary endpoints; seed data; frontend lists with fallbacks.",
+      "files": [
+        "backend/finance/models.py",
+        "backend/finance/serializers.py",
+        "backend/finance/views.py",
+        "backend/finance/urls.py",
+        "backend/core/management/commands/seed_data.py",
+        "src/components/transactions/TransactionList.jsx",
+        "src/pages/Transactions.jsx",
+        "src/api/base44Client.js",
+        "src/lib/apiClient.js"
+      ]
+    },
+    {
+      "name": "Finance - Invoices",
+      "description": "Invoice, items, mark paid, send invoice endpoints; invoice PDF and list UI.",
+      "files": [
+        "backend/finance/models.py",
+        "backend/finance/serializers.py",
+        "backend/finance/views.py",
+        "src/components/invoices/InvoiceList.jsx",
+        "src/components/invoices/InvoiceForm.jsx",
+        "src/components/invoices/InvoicePDFGenerator.jsx",
+        "src/pages/Invoices.jsx"
+      ]
+    },
+    {
+      "name": "Finance - Budgets",
+      "description": "Budgets CRUD and analytics endpoints with utilization metrics.",
+      "files": [
+        "backend/finance/models.py",
+        "backend/finance/serializers.py",
+        "backend/finance/views.py",
+        "src/pages/Dashboard.jsx"
+      ]
+    },
+    {
+      "name": "Finance - Cash Flow & Forecasts & Credit Score",
+      "description": "Cash flow entries, AI forecast placeholder, credit score calculation endpoint.",
+      "files": [
+        "backend/finance/models.py",
+        "backend/finance/serializers.py",
+        "backend/finance/views.py"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Summary widgets, recent transactions, charts and alerts wiring.",
+      "files": [
+        "src/pages/Dashboard.jsx",
+        "src/components/dashboard/RecentTransactions.jsx",
+        "src/components/dashboard/AIAlerts.jsx",
+        "src/components/dashboard/CashFlowChart.jsx",
+        "src/components/dashboard/MetricCard.jsx"
+      ]
+    },
+    {
+      "name": "Voice Assistant (Gemini & ElevenLabs)",
+      "description": "Audio capture and TTS; local persistence; settings for API keys.",
+      "files": [
+        "src/pages/VoiceAssistant.jsx",
+        "src/pages/ElevenLabs.jsx",
+        "src/services/elevenLabsService.js",
+        "src/services/geminiService.js",
+        "src/services/audioUtils.js",
+        "src/store/voiceStore.js"
+      ]
+    },
+    {
+      "name": "Frontend App Shell & Routing",
+      "description": "Vite + React app, routes, layout, navigation and UI components.",
+      "files": [
+        "src/App.jsx",
+        "src/routes.jsx",
+        "src/layouts/Layout.jsx",
+        "src/components/Navigation.jsx",
+        "src/components/ui/*",
+        "vite.config.js",
+        "package.json"
+      ]
+    },
+    {
+      "name": "API Clients & Fallbacks",
+      "description": "Thin client for Django API with token refresh; base44 adapter normalizes data and provides mock fallbacks.",
+      "files": [
+        "src/lib/apiClient.js",
+        "src/api/base44Client.js"
+      ]
+    }
+  ]
+}
+
+
+
+
+
+
