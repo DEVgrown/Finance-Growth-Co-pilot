@@ -20,6 +20,8 @@ from .serializers import (
     BudgetAnalyticsSerializer
 )
 from users.models import Business
+from .cache_utils import cached_response
+from django.core.cache import cache
 
 
 class IsOwner(permissions.BasePermission):
@@ -158,7 +160,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
         }
         
         serializer = FinancialSummarySerializer(summary_data)
-        return Response(serializer.data)
+        return Response(serializer.data)#
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        
+        # Invalidate dashboard cache for this user
+        if response.status_code in [200, 201]:
+            user_id = request.user.id
+            business_id = request.data.get('business', '')
+            cache_key_pattern = f"dashboard:user_{user_id}:business_{business_id}:period_*"
+            # For database cache, we need to delete specific keys
+            # Delete common periods
+            for period in ['30', '7', '90', '365']:
+                cache_key = f"dashboard:user_{user_id}:business_{business_id}:period_{period}"
+                cache.delete(cache_key)
+                cache_key_no_biz = f"dashboard:user_{user_id}:business_:period_{period}"
+                cache.delete(cache_key_no_biz)
+        
+        return response 
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
@@ -198,6 +217,38 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice.status = 'paid'
         invoice.paid_date = timezone.now().date()
         invoice.save()
+        return Response({'message': 'Invoice marked as paid'})
+
+    # In InvoiceViewSet class, update/create these methods:
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        if response.status_code in [200, 201]:
+            from .cache_utils import invalidate_dashboard_cache
+            business_id = request.data.get('business', '')
+            invalidate_dashboard_cache(request.user.id, business_id)
+        return response
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        if response.status_code in [200]:
+            from .cache_utils import invalidate_dashboard_cache
+            invoice = self.get_object()
+            business_id = str(invoice.business_id) if invoice.business_id else None
+            invalidate_dashboard_cache(request.user.id, business_id)
+        return response
+
+    @action(detail=True, methods=['post'])
+    def mark_paid(self, request, pk=None):
+        """Mark invoice as paid"""
+        invoice = self.get_object()
+        invoice.status = 'paid'
+        invoice.paid_date = timezone.now().date()
+        invoice.save()
+        # Invalidate cache
+        from .cache_utils import invalidate_dashboard_cache
+        business_id = str(invoice.business_id) if invoice.business_id else None
+        invalidate_dashboard_cache(request.user.id, business_id)
         return Response({'message': 'Invoice marked as paid'})
 
 
@@ -258,6 +309,24 @@ class BudgetViewSet(viewsets.ModelViewSet):
         
         serializer = BudgetAnalyticsSerializer(analytics_data)
         return Response(serializer.data)
+
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        if response.status_code in [200, 201]:
+            from .cache_utils import invalidate_dashboard_cache
+            business_id = request.data.get('business', '')
+            invalidate_dashboard_cache(request.user.id, business_id)
+        return response
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        if response.status_code in [200]:
+            from .cache_utils import invalidate_dashboard_cache
+            budget = self.get_object()
+            business_id = str(budget.business_id) if budget.business_id else None
+            invalidate_dashboard_cache(request.user.id, business_id)
+        return response
 
 
 class CashFlowViewSet(viewsets.ModelViewSet):
@@ -373,6 +442,7 @@ class CreditScoreViewSet(viewsets.ModelViewSet):
 
 
 # Additional API endpoints
+@cached_response(timeout=300, key_prefix="dashboard")  # Cache for 5 minutes
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def dashboard_data(request):
