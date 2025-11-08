@@ -148,3 +148,165 @@ class Customer(models.Model):
     def outstanding_balance(self):
         """Calculate outstanding balance"""
         return self.total_invoiced - self.total_paid
+
+
+class Membership(models.Model):
+    """Links a user to a business with a role within that business.
+
+    This supports multi-tenant teams where a single user can belong to
+    multiple businesses with different roles.
+    """
+    ROLE_CHOICES = [
+        ('business_admin', 'Business Admin'),
+        ('staff', 'Staff'),
+        ('viewer', 'Viewer'),
+    ]
+
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships')
+    role_in_business = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
+    invited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_business_invitations')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['business', 'user']]
+        indexes = [
+            models.Index(fields=['business', 'user']),
+            models.Index(fields=['business', 'role_in_business']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.business.legal_name} ({self.role_in_business})"
+
+
+class BusinessInvitation(models.Model):
+    """Invitation model for inviting users to join a business"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+        ('expired', 'Expired'),
+    ]
+    
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='invitations')
+    email = models.EmailField()
+    role_in_business = models.CharField(max_length=20, choices=Membership.ROLE_CHOICES, default='staff')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invitations')
+    token = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = [['business', 'email', 'status']]
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['business', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"Invitation for {self.email} to {self.business.legal_name} ({self.status})"
+
+
+class BusinessRegistration(models.Model):
+    """Business registration application model"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('needs_revision', 'Needs Revision'),
+    ]
+    
+    # Business Information
+    business_name = models.CharField(max_length=255)
+    business_type = models.CharField(max_length=100)
+    registration_number = models.CharField(max_length=100)
+    tax_pin = models.CharField(max_length=50)
+    location = models.CharField(max_length=255)
+    monthly_revenue = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    
+    # Owner Information
+    owner_name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=20)
+    
+    # Documents
+    registration_certificate_url = models.URLField(max_length=500, blank=True)
+    kra_pin_certificate_url = models.URLField(max_length=500, blank=True)
+    id_document_url = models.URLField(max_length=500, blank=True)
+    
+    # Status and Approval
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_registrations')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['email']),
+        ]
+    
+    def __str__(self):
+        return f"{self.business_name} - {self.status}"
+
+
+class IndividualRegistration(models.Model):
+    """Individual user registration application model"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    # Personal Information
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=20)
+    id_number = models.CharField(max_length=50)
+    date_of_birth = models.DateField(null=True, blank=True)
+    
+    # Location
+    country = models.CharField(max_length=100, default='Kenya')
+    city = models.CharField(max_length=100)
+    
+    # Business Selection (optional - can be assigned later by admin)
+    preferred_business = models.ForeignKey(Business, on_delete=models.SET_NULL, null=True, blank=True, related_name='individual_registrations')
+    
+    # Documents
+    id_document_url = models.URLField(max_length=500, blank=True)
+    
+    # Status and Approval
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_individual_registrations')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    
+    # Assigned business and role (set by admin during approval)
+    assigned_business = models.ForeignKey(Business, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_individuals')
+    assigned_role = models.CharField(max_length=20, choices=Membership.ROLE_CHOICES, default='staff')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['email']),
+        ]
+    
+    def __str__(self):
+        return f"{self.full_name} - {self.status}"

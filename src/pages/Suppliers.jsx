@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import apiClient from "../lib/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Users, Star } from "lucide-react";
+import toast from "react-hot-toast";
+import { useAuth } from "../contexts/AuthContext";
 
 import SupplierForm from "../components/suppliers/SupplierForm";
 import SupplierList from "../components/suppliers/SupplierList";
@@ -12,35 +14,90 @@ export default function Suppliers() {
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const queryClient = useQueryClient();
+  const { getBusinesses, activeBusinessId, user } = useAuth();
+  const businesses = getBusinesses();
+  const businessId = activeBusinessId || businesses[0]?.id;
 
-  const { data: suppliers = [], isLoading } = useQuery({
-    queryKey: ['suppliers'],
-    queryFn: () => base44.entities.Supplier.list('-created_date'),
-    initialData: []
+  const { data: suppliers = [], isLoading, error } = useQuery({
+    queryKey: ['suppliers', businessId],
+    queryFn: async () => {
+      try {
+        if (!businessId) {
+          return [];
+        }
+        const queryString = new URLSearchParams({ business: businessId }).toString();
+        return await apiClient.get(`/finance/suppliers/?${queryString}`);
+      } catch (error) {
+        console.error('Failed to load suppliers:', error);
+        return [];
+      }
+    },
+    enabled: !!businessId,
+    initialData: [],
+    retry: false
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Supplier.create(data),
+    mutationFn: async (data) => {
+      const supplierData = {
+        business: businessId,
+        user: user?.id,
+        supplier_name: data.supplier_name,
+        contact_person: data.contact_person || '',
+        email: data.email || '',
+        phone_number: data.phone_number,
+        address: data.address || '',
+        city: data.city || '',
+        country: data.country || 'Kenya',
+        category: data.category || '',
+        tax_id: data.tax_id || '',
+        registration_number: data.registration_number || '',
+        status: data.status || 'active',
+        reliability_score: data.reliability_score || null,
+        payment_terms: data.payment_terms || '',
+        credit_limit: data.credit_limit || null,
+        notes: data.notes || '',
+        tags: data.tags || []
+      };
+      return await apiClient.post('/finance/suppliers/', supplierData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       setShowForm(false);
       setEditingSupplier(null);
+      toast.success('Supplier created successfully');
+    },
+    onError: (error) => {
+      console.error('Supplier creation error:', error);
+      toast.error(error.message || 'Failed to create supplier');
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Supplier.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      return await apiClient.put(`/finance/suppliers/${id}/`, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       setShowForm(false);
       setEditingSupplier(null);
+      toast.success('Supplier updated successfully');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update supplier');
     }
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Supplier.delete(id),
+    mutationFn: async (id) => {
+      return await apiClient.delete(`/finance/suppliers/${id}/`);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      toast.success('Supplier deleted successfully');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete supplier');
     }
   });
 

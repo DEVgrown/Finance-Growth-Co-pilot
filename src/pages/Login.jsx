@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { apiClient } from "@/lib/apiClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LogIn, AlertCircle, Loader2, Building2 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -17,6 +17,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const auth = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,32 +25,26 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await base44.auth.login(username, password);
+      const result = await auth.login(username, password);
       
-      if (response && response.access) {
-        // Invalidate user queries to fetch fresh data
-        queryClient.invalidateQueries({ queryKey: ['user'] });
-        queryClient.invalidateQueries({ queryKey: ['userProfile'] });
-        
-        // Fetch user profile to determine role and redirect
-        try {
-          const profile = await apiClient.getUserProfile();
-          const role = profile?.role || 'owner';
-          
-          // Redirect based on role
-          if (role === 'admin') {
-            navigate('/admin-dashboard', { replace: true });
-          } else if (role === 'data_entry') {
-            navigate('/data-entry-dashboard', { replace: true });
-          } else {
-            navigate('/dashboard', { replace: true });
+      if (result && result.success) {
+        // Small delay to ensure state is updated before navigation
+        setTimeout(() => {
+          // Decide redirect based on role and memberships
+          if (auth.isSuperAdmin()) {
+            navigate('/super-admin', { replace: true });
+            return;
           }
-        } catch (profileError) {
-          // If profile fetch fails, default to owner dashboard
+          const businesses = auth.getBusinesses();
+          const adminBiz = businesses.find(b => b.role === 'business_admin');
+          if (adminBiz) {
+            navigate(`/business/${adminBiz.id}/dashboard`, { replace: true });
+            return;
+          }
           navigate('/dashboard', { replace: true });
-        }
+        }, 100);
       } else {
-        setError("Login failed. Please check your credentials.");
+        setError(result?.error || "Login failed. Please check your credentials.");
       }
     } catch (err) {
       setError(err.message || "Invalid username or password. Please try again.");
@@ -59,32 +54,28 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col">
-      {/* SME Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 via-teal-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Building2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="font-bold text-gray-900 text-lg">FinanceGrowth</h2>
-              <p className="text-xs text-gray-500">SME Co-Pilot</p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+      </div>
 
-      {/* Login Section */}
-      <div className="flex-1 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-none shadow-2xl">
-        <CardHeader className="text-center space-y-2 pb-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <LogIn className="w-8 h-8 text-white" />
+      {/* Login Card */}
+      <Card className="w-full max-w-md border-none shadow-2xl backdrop-blur-sm bg-white/95 relative z-10">
+        <CardHeader className="text-center space-y-3 pb-6">
+          {/* Logo */}
+          <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg transform hover:scale-105 transition-transform">
+            <Building2 className="w-10 h-10 text-white" />
           </div>
-          <CardTitle className="text-3xl font-bold text-gray-900">Welcome Back</CardTitle>
-          <CardDescription className="text-base">
-            Sign in to your FinanceGrowth Co-Pilot account
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">FinanceGrowth</h1>
+            <p className="text-sm text-gray-500">SME Financial Co-Pilot</p>
+          </div>
+          <CardTitle className="text-3xl font-bold text-gray-900 pt-4">Welcome Back</CardTitle>
+          <CardDescription className="text-base text-gray-600">
+            Sign in to manage your business finances
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,7 +97,7 @@ export default function Login() {
                 placeholder="Enter your username"
                 required
                 disabled={isLoading}
-                className="h-11"
+                className="h-11 border-gray-300"
               />
             </div>
 
@@ -120,14 +111,14 @@ export default function Login() {
                 placeholder="Enter your password"
                 required
                 disabled={isLoading}
-                className="h-11"
+                className="h-11 border-gray-300"
               />
             </div>
 
             <Button
               type="submit"
               disabled={isLoading || !username || !password}
-              className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isLoading ? (
                 <>
@@ -143,15 +134,41 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
-            <p>
-              Don't have an account? Contact your administrator to get your username and password.
+          <div className="mt-6 text-center space-y-3">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">New to FinanceGrowth?</span>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
+              onClick={() => navigate('/register')}
+            >
+              <Building2 className="w-4 h-4 mr-2" />
+              Register Your Business
+            </Button>
+            <p className="text-xs text-gray-500">
+              Already registered? <Button variant="link" className="p-0 h-auto text-blue-600 text-xs" onClick={() => navigate('/registration-status')}>Check status</Button>
             </p>
           </div>
         </CardContent>
       </Card>
-      </div>
     </div>
   );
 }
+
+// Add these animations to your global CSS or tailwind.config.js
+// @keyframes blob {
+//   0% { transform: translate(0px, 0px) scale(1); }
+//   33% { transform: translate(30px, -50px) scale(1.1); }
+//   66% { transform: translate(-20px, 20px) scale(0.9); }
+//   100% { transform: translate(0px, 0px) scale(1); }
+// }
+// .animate-blob { animation: blob 7s infinite; }
+// .animation-delay-2000 { animation-delay: 2s; }
+// .animation-delay-4000 { animation-delay: 4s; }
 

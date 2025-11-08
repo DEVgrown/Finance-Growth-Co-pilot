@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users,
@@ -39,7 +39,7 @@ export default function Clients() {
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['customers'],
-    queryFn: () => base44.entities.Customer.list('-created_at', 100),
+    queryFn: () => base44.entities.Customer.list('-created_at', {}),
     initialData: []
   });
 

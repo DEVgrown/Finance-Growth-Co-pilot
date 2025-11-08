@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import apiClient from "../../lib/apiClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, CheckCircle, AlertCircle, Sparkles, X } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, Sparkles, X, Loader2 } from "lucide-react";
 
-export default function ImportInvoices({ onClose }) {
+export default function ImportInvoices({ onClose, businessId }) {
   const [file, setFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
@@ -23,78 +24,80 @@ export default function ImportInvoices({ onClose }) {
     setResult(null);
 
     try {
-      // Step 1: Upload file
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: selectedFile });
+      // For now, parse CSV manually or use a simple parser
+      // In production, you'd upload to backend for AI processing
+      const text = await selectedFile.text();
+      
+      // Simple CSV parser (you can enhance this)
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      
+      if (!headers.includes('customer_name') && !headers.includes('Customer Name')) {
+        throw new Error('CSV must include customer_name column');
+      }
 
-      // Step 2: AI extracts invoice data
-      const extractionResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            invoices: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  invoice_number: { type: "string" },
-                  customer_name: { type: "string" },
-                  customer_email: { type: "string" },
-                  customer_phone: { type: "string" },
-                  issue_date: { type: "string" },
-                  due_date: { type: "string" },
-                  items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        description: { type: "string" },
-                        quantity: { type: "number" },
-                        unit_price: { type: "number" },
-                        total: { type: "number" }
-                      }
-                    }
-                  },
-                  subtotal: { type: "number" },
-                  tax: { type: "number" },
-                  total_amount: { type: "number" },
-                  notes: { type: "string" }
-                }
-              }
-            }
-          }
+      const invoices = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        
+        // Skip empty rows
+        if (values.every(v => !v)) continue;
+        
+        const invoice = {
+          invoice_number: values[headers.indexOf('invoice_number')] || values[headers.indexOf('Invoice Number')] || `IMPORT-${Date.now()}-${i}`,
+          customer_name: values[headers.indexOf('customer_name')] || values[headers.indexOf('Customer Name')] || values[headers.indexOf('Customer')] || '',
+          customer_email: values[headers.indexOf('customer_email')] || values[headers.indexOf('Email')] || values[headers.indexOf('Customer Email')] || '',
+          customer_phone: values[headers.indexOf('customer_phone')] || values[headers.indexOf('Phone')] || values[headers.indexOf('Customer Phone')] || '',
+          subtotal: parseFloat(values[headers.indexOf('subtotal')] || values[headers.indexOf('Subtotal')] || 0),
+          tax_amount: parseFloat(values[headers.indexOf('tax_amount')] || values[headers.indexOf('Tax')] || values[headers.indexOf('Tax Amount')] || 0),
+          total_amount: parseFloat(values[headers.indexOf('total_amount')] || values[headers.indexOf('Total')] || values[headers.indexOf('Total Amount')] || 0),
+          issue_date: values[headers.indexOf('issue_date')] || values[headers.indexOf('Issue Date')] || new Date().toISOString().split('T')[0],
+          due_date: values[headers.indexOf('due_date')] || values[headers.indexOf('Due Date')] || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'draft',
+          currency: 'KES',
+          business: businessId,
+        };
+        
+        // Calculate total if not provided
+        if (!invoice.total_amount && invoice.subtotal) {
+          invoice.total_amount = invoice.subtotal + (invoice.tax_amount || 0);
         }
+        
+        if (invoice.customer_name && invoice.total_amount > 0) {
+          invoices.push(invoice);
+        }
+      }
+
+      if (invoices.length === 0) {
+        throw new Error('No valid invoices found in file');
+      }
+
+      // Create invoices via API
+      const created = [];
+      for (const invoice of invoices) {
+        try {
+          const createdInvoice = await apiClient.createInvoice(invoice);
+          created.push(createdInvoice);
+        } catch (err) {
+          console.error('Error creating invoice:', err);
+        }
+      }
+
+      setResult({
+        success: true,
+        count: created.length,
+        message: `Successfully imported ${created.length} invoice(s)`
       });
 
-      if (extractionResult.status === "success") {
-        // Step 3: Insert invoices into database
-        const invoices = extractionResult.output.invoices;
-        await base44.entities.Invoice.bulkCreate(
-          invoices.map(inv => ({
-            ...inv,
-            status: "draft"
-          }))
-        );
-
-        setResult({
-          success: true,
-          count: invoices.length,
-          message: `Successfully imported ${invoices.length} invoice(s)`
-        });
-
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      } else {
-        setResult({
-          success: false,
-          message: extractionResult.details || "Failed to extract invoice data"
-        });
-      }
+      toast.success(`Successfully imported ${created.length} invoice(s)`);
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
       console.error("Import error:", error);
       setResult({
         success: false,
-        message: "Error processing file. Please ensure it's a valid invoice document."
+        message: error.message || "Error processing file. Please ensure it's a valid CSV file with required columns."
       });
+      toast.error(error.message || "Error processing file. Please check the CSV format.");
     }
 
     setIsProcessing(false);
@@ -105,8 +108,8 @@ export default function ImportInvoices({ onClose }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            AI Invoice Import
+            <Sparkles className="w-5 h-5 text-blue-600" />
+            Import Invoices
           </CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-4 h-4" />
@@ -116,25 +119,26 @@ export default function ImportInvoices({ onClose }) {
       <CardContent className="space-y-4">
         <Alert className="bg-blue-50 border-blue-200">
           <AlertDescription className="text-blue-800">
-            <strong>AI-Powered:</strong> Upload invoices (PDF, Excel, image) and our AI will automatically extract all data
+            <strong>CSV Import:</strong> Upload a CSV file with columns: customer_name, invoice_number, subtotal, tax_amount, total_amount, issue_date, due_date
           </AlertDescription>
         </Alert>
 
-        <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-purple-400 transition-colors cursor-pointer">
+        <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-blue-400 transition-colors cursor-pointer">
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <Label htmlFor="invoice-file" className="cursor-pointer">
             <div className="text-lg font-medium text-gray-900 mb-2">
               Click to upload or drag and drop
             </div>
             <p className="text-sm text-gray-500 mb-4">
-              PDF, Excel, CSV, JPG, PNG (max 10MB)
+              CSV file (max 10MB)
             </p>
           </Label>
           <Input
             id="invoice-file"
             type="file"
-            accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png"
+            accept=".csv"
             onChange={handleFileUpload}
+            disabled={isProcessing}
             className="hidden"
           />
           {file && !isProcessing && !result && (
@@ -146,10 +150,10 @@ export default function ImportInvoices({ onClose }) {
         </div>
 
         {isProcessing && (
-          <Alert className="bg-purple-50 border-purple-200">
-            <AlertDescription className="text-purple-800 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 animate-spin" />
-              AI is analyzing your document...
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertDescription className="text-blue-800 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Processing file...
             </AlertDescription>
           </Alert>
         )}
@@ -166,7 +170,7 @@ export default function ImportInvoices({ onClose }) {
         )}
 
         {result?.success && (
-          <Button onClick={onClose} className="w-full bg-gradient-to-r from-green-600 to-teal-600">
+          <Button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
             Done
           </Button>
         )}
@@ -174,5 +178,3 @@ export default function ImportInvoices({ onClose }) {
     </Card>
   );
 }
-
-

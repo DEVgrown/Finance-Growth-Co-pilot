@@ -8,8 +8,8 @@ export default function InvoiceStats({ invoices }) {
       label: "Total Invoices",
       value: invoices.length,
       icon: Receipt,
-      color: "text-purple-600",
-      bg: "bg-purple-50"
+      color: "text-blue-600",
+      bg: "bg-blue-50"
     },
     {
       label: "Pending",

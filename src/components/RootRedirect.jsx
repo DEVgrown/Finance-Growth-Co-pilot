@@ -1,48 +1,29 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
-import { apiClient } from "@/lib/apiClient";
 import Login from "@/pages/Login";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function RootRedirect() {
   const navigate = useNavigate();
-  
-  const { data: user, isLoading: isLoadingUser } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me(),
-    retry: false
-  });
-
-  const { data: userProfile, isLoading: isLoadingProfile } = useQuery({
-    queryKey: ['userProfile'],
-    queryFn: async () => {
-      try {
-        return await apiClient.getUserProfile();
-      } catch (error) {
-        return null;
-      }
-    },
-    enabled: !!user,
-    retry: false
-  });
+  const auth = useAuth();
 
   useEffect(() => {
-    // If user is authenticated and we have profile data, redirect to appropriate dashboard
-    if (user && userProfile && !isLoadingUser && !isLoadingProfile) {
-      const role = userProfile.role || 'owner';
-      
-      if (role === 'admin') {
-        navigate('/admin-dashboard', { replace: true });
-      } else if (role === 'data_entry') {
-        navigate('/data-entry-dashboard', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
-    }
-  }, [user, userProfile, isLoadingUser, isLoadingProfile, navigate]);
+    if (auth.loading) return;
+    if (!auth.isAuthenticated) return; // show login
 
-  // Show login page while checking authentication or if not authenticated
+    if (auth.isSuperAdmin()) {
+      navigate('/super-admin', { replace: true });
+      return;
+    }
+    const businesses = auth.getBusinesses();
+    const adminBiz = businesses.find(b => b.role === 'business_admin');
+    if (adminBiz) {
+      navigate(`/business/${adminBiz.id}/dashboard`, { replace: true });
+      return;
+    }
+    navigate('/dashboard', { replace: true });
+  }, [auth.loading, auth.isAuthenticated, navigate]);
+
   return <Login />;
 }
 

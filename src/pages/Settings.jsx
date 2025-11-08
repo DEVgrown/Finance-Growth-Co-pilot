@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ export default function Settings() {
 
   const { data: user } = useQuery({
     queryKey: ['user'],
-    queryFn: () => base44.auth.me()
+    queryFn: () => base44.auth.getCurrentUser()
   });
 
   const [businessData, setBusinessData] = useState({

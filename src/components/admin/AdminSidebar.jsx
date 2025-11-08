@@ -1,0 +1,204 @@
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  CheckSquare,
+  Activity,
+  FileText,
+  Settings,
+  Shield,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Bell
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+
+export default function AdminSidebar({ pendingCount = 0 }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const { user, logout } = useAuth();
+
+  const menuItems = [
+    {
+      icon: LayoutDashboard,
+      label: 'Dashboard',
+      path: '/super-admin',
+      badge: null
+    },
+    {
+      icon: Users,
+      label: 'User Management',
+      path: '/super-admin/users',
+      badge: null
+    },
+    {
+      icon: Building2,
+      label: 'Businesses',
+      path: '/super-admin/businesses',
+      badge: null
+    },
+    {
+      icon: CheckSquare,
+      label: 'Approvals',
+      path: '/super-admin/approvals',
+      badge: pendingCount > 0 ? pendingCount : null
+    },
+    {
+      icon: Activity,
+      label: 'Activity Logs',
+      path: '/super-admin/logs',
+      badge: null
+    },
+    {
+      icon: FileText,
+      label: 'Documents',
+      path: '/super-admin/documents',
+      badge: null
+    },
+    {
+      icon: BarChart3,
+      label: 'Analytics',
+      path: '/super-admin/analytics',
+      badge: null
+    },
+    {
+      icon: Shield,
+      label: 'Security',
+      path: '/super-admin/security',
+      badge: null
+    },
+    {
+      icon: Settings,
+      label: 'Settings',
+      path: '/super-admin/settings',
+      badge: null
+    }
+  ];
+
+  const isActive = (path) => {
+    if (path === '/super-admin') {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  return (
+    <div
+      className={`${
+        collapsed ? 'w-20' : 'w-64'
+      } bg-gradient-to-b from-gray-900 to-gray-800 text-white h-screen fixed left-0 top-0 transition-all duration-300 ease-in-out flex flex-col shadow-2xl`}
+      style={{ zIndex: 1000, pointerEvents: 'auto' }}
+    >
+      {/* Header */}
+      <div className="p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between">
+          {!collapsed && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Building2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg">FinanceGrowth</h2>
+                <p className="text-xs text-gray-400">Super Admin</p>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="text-gray-400 hover:text-white hover:bg-gray-700"
+          >
+            {collapsed ? (
+              <ChevronRight className="w-5 h-5" />
+            ) : (
+              <ChevronLeft className="w-5 h-5" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* User Info */}
+      {!collapsed && (
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+              {user?.username?.charAt(0).toUpperCase() || 'A'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{user?.username || 'Admin'}</p>
+              <p className="text-xs text-gray-400 truncate">{user?.email || ''}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-gray-400 hover:text-white hover:bg-gray-700"
+            >
+              <Bell className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+        <ul className="space-y-1 px-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+
+            return (
+              <li key={item.path}>
+                <Link
+                  to={item.path}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 cursor-pointer relative ${
+                    active
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  } ${collapsed ? 'justify-center' : ''}`}
+                  title={collapsed ? item.label : ''}
+                  style={{ pointerEvents: 'auto', zIndex: 100 }}
+                >
+                  <Icon className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5'} flex-shrink-0`} />
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 font-medium text-sm">{item.label}</span>
+                      {item.badge && (
+                        <Badge className="bg-red-500 text-white text-xs px-2">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                  {collapsed && item.badge && (
+                    <div className="absolute right-2 top-2 w-2 h-2 bg-red-500 rounded-full"></div>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-700">
+        <Button
+          variant="ghost"
+          onClick={logout}
+          className={`w-full text-gray-300 hover:text-white hover:bg-red-600/20 ${
+            collapsed ? 'justify-center' : 'justify-start'
+          }`}
+        >
+          <LogOut className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} />
+          {!collapsed && <span>Logout</span>}
+        </Button>
+      </div>
+    </div>
+  );
+}

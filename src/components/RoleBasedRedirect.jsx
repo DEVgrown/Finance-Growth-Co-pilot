@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { apiClient } from "@/lib/apiClient";
 
 export default function RoleBasedRedirect({ children }) {

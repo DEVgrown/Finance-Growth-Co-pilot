@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users,
@@ -11,13 +10,12 @@ import {
   AlertCircle,
   Edit,
   Save,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -25,47 +23,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import MetricCard from "../components/dashboard/MetricCard";
+import { useAuth } from "../contexts/AuthContext";
 import { apiClient } from "@/lib/apiClient";
+import toast from "react-hot-toast";
+import { CardSkeleton } from "../components/ui/skeleton";
 
 export default function AdminDashboard() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [editingUser, setEditingUser] = useState(null);
   const [newRole, setNewRole] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState("");
 
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me()
-  });
-
-  const { data: adminStats, isLoading: loadingStats } = useQuery({
+  const { data: adminStats, isLoading: loadingStats, refetch: refetchStats } = useQuery({
     queryKey: ['adminStats'],
-    queryFn: () => apiClient.getAdminStats(),
+    queryFn: async () => {
+      try {
+        return await apiClient.getAdminStats();
+      } catch (error) {
+        console.error('Failed to load admin stats:', error);
+        return null;
+      }
+    },
     enabled: !!user,
     retry: false
   });
 
-  const { data: users = [], isLoading: loadingUsers } = useQuery({
+  const { data: users = [], isLoading: loadingUsers, refetch: refetchUsers } = useQuery({
     queryKey: ['allUsers'],
-    queryFn: () => apiClient.getAllUsers(),
+    queryFn: async () => {
+      try {
+        return await apiClient.getAllUsers();
+      } catch (error) {
+        console.error('Failed to load users:', error);
+        return [];
+      }
+    },
     enabled: !!user,
     retry: false
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }) => apiClient.updateUserRole(userId, role),
+    mutationFn: async ({ userId, role }) => {
+      return await apiClient.adminUpdateUserRole(userId, role);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries(['allUsers']);
-      queryClient.invalidateQueries(['adminStats']);
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['adminStats'] });
       setEditingUser(null);
       setNewRole("");
       setShowSuccess(true);
+      toast.success('User role updated successfully!');
       setTimeout(() => setShowSuccess(false), 3000);
     },
     onError: (error) => {
-      setShowError(error.message || "Failed to update user role");
+      const errorMessage = error.message || "Failed to update user role";
+      setShowError(errorMessage);
+      toast.error(errorMessage);
       setTimeout(() => setShowError(""), 5000);
     }
   });
@@ -73,14 +88,15 @@ export default function AdminDashboard() {
   const handleRoleUpdate = (userId) => {
     if (!newRole) {
       setShowError("Please select a role");
+      toast.error("Please select a role");
       return;
     }
     updateRoleMutation.mutate({ userId, role: newRole });
   };
 
-  const startEditing = (user) => {
-    setEditingUser(user.id);
-    setNewRole(user.role || 'owner');
+  const startEditing = (userItem) => {
+    setEditingUser(userItem.id);
+    setNewRole(userItem.role || 'owner');
   };
 
   const cancelEditing = () => {
@@ -88,11 +104,19 @@ export default function AdminDashboard() {
     setNewRole("");
   };
 
+  const handleRefresh = () => {
+    refetchStats();
+    refetchUsers();
+    toast.success('Data refreshed');
+  };
+
   // Handle loading states
   if (loadingStats || loadingUsers) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p>Loading admin dashboard...</p>
+      <div className="p-4 md:p-8 space-y-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+        <CardSkeleton />
+        <CardSkeleton />
+        <CardSkeleton />
       </div>
     );
   }
@@ -104,7 +128,8 @@ export default function AdminDashboard() {
     total_businesses: 0,
     admin_users: 0,
     data_entry_users: 0,
-    owner_users: 0
+    owner_users: 0,
+    recent_users: []
   };
 
   return (
@@ -117,9 +142,17 @@ export default function AdminDashboard() {
             <Shield className="w-8 h-8 text-red-500" />
           </h1>
           <p className="text-gray-600 mt-1">
-            Welcome, {user?.full_name || 'Admin'}. Manage all users and system overview
+            Welcome, {user?.full_name || user?.username || 'Admin'}. Manage all users and system overview
           </p>
         </div>
+        <Button
+          onClick={handleRefresh}
+          variant="outline"
+          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
       </div>
 
       {/* Success/Error Alerts */}
@@ -143,34 +176,57 @@ export default function AdminDashboard() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total Users"
-          value={stats.total_users || 0}
-          icon={Users}
-          color="blue"
-          subtitle={`${stats.active_users || 0} active`}
-        />
-        <MetricCard
-          title="Businesses"
-          value={stats.total_businesses || 0}
-          icon={Building2}
-          color="green"
-          subtitle="Total registered"
-        />
-        <MetricCard
-          title="Admin Users"
-          value={stats.admin_users || 0}
-          icon={Shield}
-          color="red"
-          subtitle="System administrators"
-        />
-        <MetricCard
-          title="Data Entry Users"
-          value={stats.data_entry_users || 0}
-          icon={UserCheck}
-          color="purple"
-          subtitle="Data entry staff"
-        />
+        <Card className="border-none shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Total Users</CardTitle>
+            <Users className="h-5 w-5 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">{stats.total_users || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">
+              {stats.active_users || 0} active users
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-lg bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Businesses</CardTitle>
+            <Building2 className="h-5 w-5 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">{stats.total_businesses || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">
+              Total registered
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-lg bg-gradient-to-br from-red-50 to-rose-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Admin Users</CardTitle>
+            <Shield className="h-5 w-5 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">{stats.admin_users || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">
+              System administrators
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-lg bg-gradient-to-br from-purple-50 to-violet-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Data Entry Users</CardTitle>
+            <UserCheck className="h-5 w-5 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">{stats.data_entry_users || 0}</div>
+            <p className="text-xs text-gray-600 mt-1">
+              Data entry staff
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Additional Stats */}
@@ -240,7 +296,7 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {users.map((userItem) => (
-                      <tr key={userItem.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={userItem.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="py-3 px-4">
                           <div>
                             <p className="font-medium text-gray-900">{userItem.full_name || userItem.username}</p>
@@ -287,17 +343,19 @@ export default function AdminDashboard() {
                                 size="sm"
                                 onClick={() => handleRoleUpdate(userItem.id)}
                                 disabled={updateRoleMutation.isPending}
-                                className="h-7 px-2"
+                                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
                               >
-                                <Save className="w-3 h-3" />
+                                <Save className="w-3 h-3 mr-1" />
+                                Save
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={cancelEditing}
-                                className="h-7 px-2"
+                                className="h-8 px-3"
                               >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3 mr-1" />
+                                Cancel
                               </Button>
                             </div>
                           ) : (
@@ -305,9 +363,10 @@ export default function AdminDashboard() {
                               size="sm"
                               variant="outline"
                               onClick={() => startEditing(userItem)}
-                              className="h-7 px-2"
+                              className="h-8 px-3 border-blue-600 text-blue-600 hover:bg-blue-50"
                             >
-                              <Edit className="w-3 h-3" />
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
                             </Button>
                           )}
                         </td>
@@ -342,7 +401,7 @@ export default function AdminDashboard() {
                 return (
                   <div
                     key={recentUser.id}
-                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
                   >
                     <div>
                       <p className="font-medium text-gray-900">{fullUser?.full_name || recentUser.username}</p>

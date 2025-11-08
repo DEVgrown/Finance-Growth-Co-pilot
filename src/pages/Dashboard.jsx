@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -48,14 +48,30 @@ export default function Dashboard() {
 
   const { data: insights = [] } = useQuery({
     queryKey: ['insights'],
-    queryFn: () => base44.entities.AIInsight.list('-created_date', 5),
-    initialData: []
+    queryFn: async () => {
+      try {
+        return await base44.entities.AIInsight.list('-created_date', 5);
+      } catch (error) {
+        console.error('Failed to load AI insights:', error);
+        return [];
+      }
+    },
+    initialData: [],
+    retry: false
   });
 
   const { data: businessData, isLoading: loadingBusiness } = useQuery({
     queryKey: ['businesses'],
-    queryFn: () => api.business.list(),
-    initialData: [] // Provide initial data to avoid undefined
+    queryFn: async () => {
+      try {
+        return await api.business.list();
+      } catch (error) {
+        console.error('Failed to load business data:', error);
+        return [];
+      }
+    },
+    initialData: [],
+    retry: false
   });
 
   const { data: user } = useQuery({

@@ -1,10 +1,12 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
 
-export default function TransactionStats({ transactions }) {
-  const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+export default function TransactionStats({ transactions, isLoading }) {
+  // Handle both 'type' and 'transaction_type' fields
+  const income = transactions.filter(t => (t.type || t.transaction_type) === 'income').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+  const expenses = transactions.filter(t => (t.type || t.transaction_type) === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
   const net = income - expenses;
 
   const stats = [
@@ -30,6 +32,26 @@ export default function TransactionStats({ transactions }) {
       bg: net >= 0 ? "bg-blue-50" : "bg-orange-50"
     }
   ];
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="border-none shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-24 mb-3" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+                <Skeleton className="h-12 w-12 rounded-xl" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
