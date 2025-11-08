@@ -49,15 +49,20 @@ export default function RegisterNew() {
   const handleFileUpload = async (field, file, formType) => {
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onloadend = () => {
+    try {
+      setError("");
+      // Upload file to backend and get URL
+      const response = await apiClient.uploadDocument(file);
+      
       if (formType === 'business') {
-        setBusinessFormData({ ...businessFormData, [field]: reader.result });
+        setBusinessFormData({ ...businessFormData, [field]: response.url });
       } else {
-        setIndividualFormData({ ...individualFormData, [field]: reader.result });
+        setIndividualFormData({ ...individualFormData, [field]: response.url });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError(`Failed to upload ${field}: ${err.message}`);
+      console.error('File upload error:', err);
+    }
   };
 
   const handleBusinessSubmit = async (e) => {

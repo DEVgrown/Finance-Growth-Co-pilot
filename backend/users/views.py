@@ -1207,3 +1207,49 @@ def check_individual_registration_status(request, email):
         return Response(serializer.data)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_document(request):
+    """Upload a document and return its URL"""
+    import os
+    from django.conf import settings
+    
+    if 'file' not in request.FILES:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    file = request.FILES['file']
+    
+    # Validate file type
+    allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+    file_ext = os.path.splitext(file.name)[1].lower()
+    if file_ext not in allowed_extensions:
+        return Response({'error': 'Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate file size (max 5MB)
+    if file.size > 5 * 1024 * 1024:
+        return Response({'error': 'File too large. Maximum size is 5MB.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Create media directory if it doesn't exist
+    upload_dir = os.path.join(settings.MEDIA_ROOT, 'documents')
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename
+    import uuid
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = os.path.join(upload_dir, unique_filename)
+    
+    # Save file
+    with open(file_path, 'wb+') as destination:
+        for chunk in file.chunks():
+            destination.write(chunk)
+    
+    # Return URL
+    file_url = f"{request.scheme}://{request.get_host()}{settings.MEDIA_URL}documents/{unique_filename}"
+    
+    return Response({
+        'url': file_url,
+        'filename': file.name,
+        'size': file.size
+    }, status=status.HTTP_201_CREATED)

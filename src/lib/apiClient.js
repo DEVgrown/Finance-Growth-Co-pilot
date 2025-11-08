@@ -442,6 +442,32 @@ class ApiClient {
     console.log('Voice conversation:', data);
     return Promise.resolve({ id: Date.now(), ...data });
   }
+
+  // File upload
+  async uploadDocument(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const url = `${this.baseURL}/users/upload-document/`;
+    const headers = {};
+    
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('File upload failed:', error);
+      throw error;
+    }
+  }
 }
 
 // Create singleton instance

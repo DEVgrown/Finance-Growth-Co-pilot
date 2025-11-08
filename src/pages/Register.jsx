@@ -35,14 +35,15 @@ export default function Register() {
   const handleFileUpload = async (field, file) => {
     if (!file) return;
     
-    // In production, upload to backend file storage
-    // For now, create a data URL or use a placeholder
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      // Use base64 or upload to storage service
-      setFormData({ ...formData, [field]: reader.result });
-    };
-    reader.readAsDataURL(file);
+    try {
+      setError("");
+      // Upload file to backend and get URL
+      const response = await apiClient.uploadDocument(file);
+      setFormData({ ...formData, [field]: response.url });
+    } catch (err) {
+      setError(`Failed to upload ${field}: ${err.message}`);
+      console.error('File upload error:', err);
+    }
   };
 
   const handleSubmit = async (e) => {
