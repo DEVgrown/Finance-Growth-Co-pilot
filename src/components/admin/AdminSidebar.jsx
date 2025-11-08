@@ -157,27 +157,35 @@ export default function AdminSidebar({ pendingCount = 0 }) {
               <li key={item.path}>
                 <Link
                   to={item.path}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 cursor-pointer relative ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 cursor-pointer relative no-underline ${
                     active
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg font-bold'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white font-medium'
                   } ${collapsed ? 'justify-center' : ''}`}
                   title={collapsed ? item.label : ''}
-                  style={{ pointerEvents: 'auto', zIndex: 100 }}
+                  style={{ 
+                    pointerEvents: 'auto', 
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
                 >
                   <Icon className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5'} flex-shrink-0`} />
                   {!collapsed && (
                     <>
                       <span className="flex-1 font-medium text-sm">{item.label}</span>
                       {item.badge && (
-                        <Badge className="bg-red-500 text-white text-xs px-2">
+                        <Badge className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                           {item.badge}
                         </Badge>
                       )}
                     </>
                   )}
                   {collapsed && item.badge && (
-                    <div className="absolute right-2 top-2 w-2 h-2 bg-red-500 rounded-full"></div>
+                    <div className="absolute right-2 top-2 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900"></div>
                   )}
                 </Link>
               </li>
@@ -190,12 +198,22 @@ export default function AdminSidebar({ pendingCount = 0 }) {
       <div className="p-4 border-t border-gray-700">
         <Button
           variant="ghost"
-          onClick={logout}
-          className={`w-full text-gray-300 hover:text-white hover:bg-red-600/20 ${
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            logout();
+          }}
+          className={`w-full flex items-center gap-3 text-gray-300 hover:text-white hover:bg-red-600/20 transition-all cursor-pointer font-medium ${
             collapsed ? 'justify-center' : 'justify-start'
           }`}
+          style={{ 
+            pointerEvents: 'auto',
+            zIndex: 1000,
+            background: 'transparent',
+            border: 'none'
+          }}
         >
-          <LogOut className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} />
+          <LogOut className={`${collapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
           {!collapsed && <span>Logout</span>}
         </Button>
       </div>

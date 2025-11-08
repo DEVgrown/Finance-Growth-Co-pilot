@@ -35,9 +35,13 @@ import BusinessMonitoring from "./pages/admin/BusinessMonitoring";
 import RegisterNew from "./pages/RegisterNew";
 import RegistrationStatus from "./pages/RegistrationStatus";
 import SuperAdminApprovals from "./pages/SuperAdminApprovals";
+import RoutingDiagnostic from "./pages/RoutingDiagnostic";
+import Analytics from "./pages/admin/Analytics";
+import Security from "./pages/admin/Security";
+import AdminSettings from "./pages/admin/AdminSettings";
 
 export const router = createBrowserRouter([
-  // Super Admin Routes with Sidebar (MUST be first to avoid being caught by Layout)
+  // Super Admin Routes with AdminLayout (MUST be first to avoid being caught by Layout)
   {
     path: "/super-admin",
     element: <RequireAuth><RequireSuperAdmin><AdminLayout /></RequireSuperAdmin></RequireAuth>,
@@ -75,17 +79,27 @@ export const router = createBrowserRouter([
       },
       {
         path: "analytics",
-        element: <div className="p-8 bg-white min-h-screen"><h1 className="text-3xl font-bold">Analytics & Reports</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>,
+        element: <Analytics />,
         errorElement: <ErrorBoundary />
       },
       {
         path: "security",
-        element: <SecurityModule />,
+        element: <Security />,
         errorElement: <ErrorBoundary />
       },
       {
         path: "settings",
-        element: <ModuleAssignment />,
+        element: <AdminSettings />,
+        errorElement: <ErrorBoundary />
+      },
+      {
+        path: "test",
+        element: <SuperAdminDashboardTest />,
+        errorElement: <ErrorBoundary />
+      },
+      {
+        path: "diagnostic",
+        element: <RoutingDiagnostic />,
         errorElement: <ErrorBoundary />
       }
     ]
@@ -97,7 +111,7 @@ export const router = createBrowserRouter([
     errorElement: <ErrorBoundary />,
     index: true
   },
-  // Main Layout Routes
+  // Main Layout Routes (for regular users, business admins, etc.)
   {
     element: <Layout />,
     errorElement: <ErrorBoundary />,

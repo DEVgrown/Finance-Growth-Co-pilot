@@ -153,7 +153,18 @@ export default function Layout() {
   const queryClient = useQueryClient();
   const { user, logout, isSuperAdmin, isBusinessAdmin, activeBusinessId, setActiveBusiness, getBusinesses } = useAuth();
 
-  console.log('⚪ Main Layout RENDERING - This should NOT show for /super-admin routes');
+  console.log('⚪⚪⚪ Main Layout RENDERING - This should NOT show for /super-admin routes');
+  console.log('⚪ Current path:', location.pathname);
+  console.log('⚪ User:', user);
+  console.log('⚪ Is Super Admin:', isSuperAdmin());
+
+  // CRITICAL: If this is a super admin on a /super-admin route, something is wrong!
+  if (location.pathname.startsWith('/super-admin')) {
+    console.error('❌❌❌ ERROR: Main Layout is rendering for /super-admin route!');
+    console.error('❌ This should use AdminLayout instead!');
+    console.error('❌ Redirecting to fix the issue...');
+    // Don't redirect here as it might cause a loop
+  }
 
   // Filter navigation items based on user role
   const navigationItems = baseNavigationItems.filter(item => {

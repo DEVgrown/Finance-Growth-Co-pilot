@@ -1,4 +1,5 @@
 # backend/finance/views.py
+from .cache_utils import cached_response, invalidate_dashboard_cache
 from django.shortcuts import render
 from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone

@@ -28,21 +28,29 @@ export default function Login() {
       const result = await auth.login(username, password);
       
       if (result && result.success) {
-        // Small delay to ensure state is updated before navigation
-        setTimeout(() => {
-          // Decide redirect based on role and memberships
-          if (auth.isSuperAdmin()) {
-            navigate('/super-admin', { replace: true });
-            return;
-          }
-          const businesses = auth.getBusinesses();
-          const adminBiz = businesses.find(b => b.role === 'business_admin');
-          if (adminBiz) {
-            navigate(`/business/${adminBiz.id}/dashboard`, { replace: true });
-            return;
-          }
-          navigate('/dashboard', { replace: true });
-        }, 100);
+        // Use the user data returned from login to make redirect decision
+        const userData = result.user;
+        
+        console.log('🔑 Login successful, user data:', userData);
+        console.log('🔑 is_superuser:', userData?.is_superuser);
+        
+        // Decide redirect based on role and memberships from fresh user data
+        if (userData?.is_superuser === true) {
+          console.log('✅ Redirecting to /super-admin');
+          navigate('/super-admin', { replace: true });
+          return;
+        }
+        
+        const memberships = userData?.memberships || [];
+        const adminBiz = memberships.find(b => b.role_in_business === 'business_admin');
+        if (adminBiz) {
+          console.log('✅ Redirecting to business dashboard:', adminBiz.business_id);
+          navigate(`/business/${adminBiz.business_id}/dashboard`, { replace: true });
+          return;
+        }
+        
+        console.log('✅ Redirecting to /dashboard');
+        navigate('/dashboard', { replace: true });
       } else {
         setError(result?.error || "Login failed. Please check your credentials.");
       }

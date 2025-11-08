@@ -106,7 +106,8 @@ export function AuthProvider({ children }) {
             }));
             setUser(userResponse);
             setIsAuthenticated(true);
-            return { success: true };
+            // Return user data so Login component can make redirect decision
+            return { success: true, user: userResponse };
           }
         } catch (userError) {
           console.error('Failed to fetch user data:', userError);
