@@ -27,13 +27,20 @@ export default function SuperAdminApprovals() {
   const queryClient = useQueryClient();
 
   // Fetch pending business registrations
-  const { data: businessRegistrations = [], isLoading: loadingBusiness } = useQuery({
+  const { data: businessRegistrations = [], isLoading: loadingBusiness, error: businessError } = useQuery({
     queryKey: ['pending-business-registrations'],
     queryFn: async () => {
-      return await apiClient.request('/users/admin/pending-registrations/');
+      const data = await apiClient.request('/users/admin/pending-registrations/');
+      console.log('Business registrations fetched:', data);
+      return data;
     },
     enabled: isSuperAdmin()
   });
+  
+  // Log any errors
+  if (businessError) {
+    console.error('Error fetching business registrations:', businessError);
+  }
 
   // Fetch pending individual registrations
   const { data: individualRegistrations = [], isLoading: loadingIndividual } = useQuery({
@@ -160,9 +167,18 @@ export default function SuperAdminApprovals() {
 
         {/* Business Registrations Tab */}
         <TabsContent value="business" className="space-y-4">
+          {businessError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Error loading registrations: {businessError.message}
+              </AlertDescription>
+            </Alert>
+          )}
           {loadingBusiness ? (
             <div className="text-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+              <p className="text-gray-500 mt-2">Loading registrations...</p>
             </div>
           ) : businessRegistrations.length === 0 ? (
             <Card>
