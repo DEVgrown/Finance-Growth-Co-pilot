@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Transaction, Invoice, InvoiceItem, Budget, CashFlow, 
-    FinancialForecast, CreditScore
+    FinancialForecast, CreditScore, Supplier
 )
 from users.models import Business, UserProfile
 
@@ -189,3 +189,22 @@ class BudgetAnalyticsSerializer(serializers.Serializer):
     near_limit_count = serializers.IntegerField()
     budget_utilization = serializers.DecimalField(max_digits=5, decimal_places=2)
     currency = serializers.CharField(max_length=3)
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    """Serializer for Supplier model"""
+    
+    business_name = serializers.CharField(source='business.legal_name', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Supplier
+        fields = [
+            'id', 'business', 'user', 'business_name', 'user_name',
+            'supplier_name', 'contact_person', 'email', 'phone_number',
+            'address', 'city', 'country', 'category', 'tax_id',
+            'registration_number', 'status', 'reliability_score',
+            'payment_terms', 'credit_limit', 'notes', 'tags',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']

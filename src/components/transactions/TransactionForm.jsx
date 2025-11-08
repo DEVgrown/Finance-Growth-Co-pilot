@@ -15,7 +15,14 @@ const CATEGORIES = {
   ]
 };
 
-const SOURCES = ["mpesa", "bank", "cash", "invoice", "manual"];
+const SOURCES = [
+  { value: "mpesa", label: "M-Pesa" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "cheque", label: "Cheque" },
+  { value: "other", label: "Other" }
+];
 
 export default function TransactionForm({ transaction, onSubmit, onCancel, isSubmitting }) {
   const [formData, setFormData] = useState(transaction || {
@@ -24,7 +31,7 @@ export default function TransactionForm({ transaction, onSubmit, onCancel, isSub
     category: "",
     description: "",
     transaction_date: new Date().toISOString().split('T')[0],
-    source: "manual",
+    source: "mpesa",
     party_name: "",
     notes: ""
   });
@@ -84,7 +91,7 @@ export default function TransactionForm({ transaction, onSubmit, onCancel, isSub
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES[formData.type].map((cat) => (
+                  {(CATEGORIES[formData.type] || []).map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </SelectItem>
@@ -115,8 +122,8 @@ export default function TransactionForm({ transaction, onSubmit, onCancel, isSub
                 </SelectTrigger>
                 <SelectContent>
                   {SOURCES.map((source) => (
-                    <SelectItem key={source} value={source}>
-                      {source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    <SelectItem key={source.value} value={source.value}>
+                      {source.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

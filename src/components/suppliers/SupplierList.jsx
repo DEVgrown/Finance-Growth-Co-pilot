@@ -31,11 +31,16 @@ export default function SupplierList({ suppliers, isLoading, onEdit, onDelete })
       </CardHeader>
       <CardContent>
         <div className="grid gap-4">
-          {suppliers.map((supplier) => (
-            <div
-              key={supplier.id}
-              className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors gap-4"
-            >
+          {suppliers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No suppliers found. Add your first supplier to get started.
+            </div>
+          ) : (
+            suppliers.map((supplier) => (
+              <div
+                key={supplier.id || supplier.supplier_name}
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors gap-4"
+              >
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="font-bold text-gray-900">{supplier.supplier_name}</h3>
@@ -91,7 +96,8 @@ export default function SupplierList({ suppliers, isLoading, onEdit, onDelete })
                 </Button>
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

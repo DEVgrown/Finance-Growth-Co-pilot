@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,25 +18,30 @@ export default function ClientOnboarding({ onClose }) {
     physical_address: "",
     payment_terms: "Net 30"
   });
+  const [error, setError] = useState("");
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const user = await base44.auth.me();
+      // Backend sets owner, business and onboarded_by server-side
       return await base44.entities.Customer.create({
         ...data,
-        onboarded_by: user.email,
         status: "active"
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
+    },
+    onError: (e) => {
+      const message = e?.message || 'Failed to create client.';
+      setError(message);
     }
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     await createMutation.mutateAsync(formData);
   };
 
@@ -55,6 +60,11 @@ export default function ClientOnboarding({ onClose }) {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {error}
+            </div>
+          )}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="customer_name">Client Name *</Label>

@@ -47,12 +47,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
-    'rest_framework',
     'corsheaders',
+    'rest_framework',
     'rest_framework_simplejwt',
     'users',
-    'finance'
+    'finance',
+    'core',
 ]
 
 MIDDLEWARE = [
@@ -204,3 +204,20 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_CREDENTIALS = True
+
+# Update middleware to include CORS at the top
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+

@@ -2,7 +2,7 @@ import React from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { base44 } from "@/api/base44Client";
+import base44 from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function AIAlerts({ insights }) {

@@ -11,17 +11,35 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from .models import (
     Transaction, Invoice, InvoiceItem, Budget, CashFlow, 
-    FinancialForecast, CreditScore
+    FinancialForecast, CreditScore, Supplier
 )
 from .serializers import (
     TransactionSerializer, InvoiceSerializer, InvoiceItemSerializer,
     BudgetSerializer, CashFlowSerializer, FinancialForecastSerializer,
     CreditScoreSerializer, FinancialSummarySerializer, TransactionAnalyticsSerializer,
-    BudgetAnalyticsSerializer
+    BudgetAnalyticsSerializer, SupplierSerializer
 )
-from users.models import Business
-from .cache_utils import cached_response
-from django.core.cache import cache
+from users.models import Business, Membership
+
+def get_user_businesses(user):
+    """Get all businesses a user is a member of"""
+    if user.is_superuser:
+        return Business.objects.all()
+    memberships = Membership.objects.filter(user=user, is_active=True)
+    return Business.objects.filter(id__in=[m.business_id for m in memberships])
+
+def get_business_queryset(user, business_id=None):
+    """Get queryset filtered by user's business access"""
+    if user.is_superuser:
+        businesses = Business.objects.all()
+    else:
+        memberships = Membership.objects.filter(user=user, is_active=True)
+        businesses = Business.objects.filter(id__in=[m.business_id for m in memberships])
+    
+    if business_id:
+        businesses = businesses.filter(id=business_id)
+    
+    return businesses.values_list('id', flat=True)
 
 
 class IsOwner(permissions.BasePermission):
@@ -37,10 +55,31 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            # Return empty list for demo mode
+        user = self.request.user
+        if not user.is_authenticated:
             return Transaction.objects.none()
-        return Transaction.objects.filter(user=self.request.user).order_by('-transaction_date')
+        
+        business_id = self.request.query_params.get('business')
+        business_ids = list(get_business_queryset(user, business_id))
+        
+        if not business_ids:
+            return Transaction.objects.none()
+        
+        # Filter by business and user (for members)
+        qs = Transaction.objects.filter(business_id__in=business_ids)
+        
+        # If user is not superuser, also filter by user or check membership role
+        if not user.is_superuser:
+            # Staff can see their own transactions, admins see all in business
+            from users.views import user_is_business_admin
+            if business_id and user_is_business_admin(user, business_id):
+                # Business admin sees all transactions in their business
+                pass
+            else:
+                # Staff sees only their own transactions
+                qs = qs.filter(user=user)
+        
+        return qs.order_by('-transaction_date')
     
     def get_permissions(self):
         # Allow list access for unauthenticated users (demo mode)
@@ -49,7 +88,50 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        # Convert to int for comparison
+        try:
+            business_id_int = int(business_id)
+        except (ValueError, TypeError):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Invalid business ID format'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id_int))
+        if not business_ids or business_id_int not in business_ids:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Get Business object
+        from users.models import Business
+        try:
+            business = Business.objects.get(id=business_id_int)
+        except Business.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business not found'})
+        
+        # Handle transaction_date - convert date string to datetime if needed
+        transaction_date = self.request.data.get('transaction_date')
+        if transaction_date:
+            from django.utils.dateparse import parse_datetime, parse_date
+            from django.utils import timezone
+            from datetime import datetime, time as dt_time
+            # Try parsing as datetime first
+            if isinstance(transaction_date, str):
+                dt = parse_datetime(transaction_date)
+                if not dt:
+                    # Try parsing as date and convert to datetime
+                    d = parse_date(transaction_date)
+                    if d:
+                        dt = timezone.make_aware(datetime.combine(d, dt_time.min))
+                if dt:
+                    serializer.validated_data['transaction_date'] = dt
+        
+        serializer.save(user=self.request.user, business=business)
     
     @action(detail=False, methods=['get'])
     def analytics(self, request):
@@ -187,10 +269,30 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
     
     def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            # Return empty list for demo mode
+        user = self.request.user
+        if not user.is_authenticated:
             return Invoice.objects.none()
-        return Invoice.objects.filter(user=self.request.user).order_by('-issue_date')
+        
+        business_id = self.request.query_params.get('business')
+        business_ids = list(get_business_queryset(user, business_id))
+        
+        if not business_ids:
+            return Invoice.objects.none()
+        
+        # Filter by business
+        qs = Invoice.objects.filter(business_id__in=business_ids)
+        
+        # If user is not superuser, filter by user or check membership role
+        if not user.is_superuser:
+            from users.views import user_is_business_admin
+            if business_id and user_is_business_admin(user, business_id):
+                # Business admin sees all invoices in their business
+                pass
+            else:
+                # Staff sees only their own invoices
+                qs = qs.filter(user=user)
+        
+        return qs.order_by('-issue_date')
     
     def get_permissions(self):
         # Allow list access for unauthenticated users (demo mode)
@@ -199,7 +301,33 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        # Convert to int for comparison
+        try:
+            business_id_int = int(business_id)
+        except (ValueError, TypeError):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Invalid business ID format'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id_int))
+        if not business_ids or business_id_int not in business_ids:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Get Business object
+        from users.models import Business
+        try:
+            business = Business.objects.get(id=business_id_int)
+        except Business.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business not found'})
+        
+        serializer.save(user=self.request.user, business=business)
     
     @action(detail=True, methods=['post'])
     def send_invoice(self, request, pk=None):
@@ -263,6 +391,20 @@ class InvoiceItemViewSet(viewsets.ModelViewSet):
         if invoice_id:
             return InvoiceItem.objects.filter(invoice_id=invoice_id, invoice__user=self.request.user)
         return InvoiceItem.objects.none()
+    
+    def perform_create(self, serializer):
+        # Validate invoice belongs to user
+        invoice_id = self.request.data.get('invoice')
+        if invoice_id:
+            try:
+                invoice = Invoice.objects.get(id=invoice_id, user=self.request.user)
+                serializer.save(invoice=invoice)
+            except Invoice.DoesNotExist:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied('Invoice not found or you do not have access to it')
+        else:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'invoice': 'Invoice ID is required'})
 
 
 class BudgetViewSet(viewsets.ModelViewSet):
@@ -275,7 +417,29 @@ class BudgetViewSet(viewsets.ModelViewSet):
         return Budget.objects.filter(user=self.request.user).order_by('-start_date')
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id))
+        if not business_ids or business_id not in [str(bid) for bid in business_ids]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Convert business_id to Business object if needed
+        if isinstance(business_id, str):
+            from users.models import Business
+            try:
+                business = Business.objects.get(id=business_id)
+            except Business.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'business': 'Business not found'})
+        else:
+            business = business_id
+        
+        serializer.save(user=self.request.user, business=business)
     
     @action(detail=False, methods=['get'])
     def analytics(self, request):
@@ -339,7 +503,29 @@ class CashFlowViewSet(viewsets.ModelViewSet):
         return CashFlow.objects.filter(user=self.request.user).order_by('-period_start')
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id))
+        if not business_ids or business_id not in [str(bid) for bid in business_ids]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Convert business_id to Business object if needed
+        if isinstance(business_id, str):
+            from users.models import Business
+            try:
+                business = Business.objects.get(id=business_id)
+            except Business.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'business': 'Business not found'})
+        else:
+            business = business_id
+        
+        serializer.save(user=self.request.user, business=business)
 
 
 class FinancialForecastViewSet(viewsets.ModelViewSet):
@@ -352,7 +538,29 @@ class FinancialForecastViewSet(viewsets.ModelViewSet):
         return FinancialForecast.objects.filter(user=self.request.user).order_by('-created_at')
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id))
+        if not business_ids or business_id not in [str(bid) for bid in business_ids]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Convert business_id to Business object if needed
+        if isinstance(business_id, str):
+            from users.models import Business
+            try:
+                business = Business.objects.get(id=business_id)
+            except Business.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'business': 'Business not found'})
+        else:
+            business = business_id
+        
+        serializer.save(user=self.request.user, business=business)
     
     @action(detail=False, methods=['post'])
     def generate_forecast(self, request):
@@ -394,7 +602,29 @@ class CreditScoreViewSet(viewsets.ModelViewSet):
         return CreditScore.objects.filter(user=self.request.user).order_by('-created_at')
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id))
+        if not business_ids or business_id not in [str(bid) for bid in business_ids]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Convert business_id to Business object if needed
+        if isinstance(business_id, str):
+            from users.models import Business
+            try:
+                business = Business.objects.get(id=business_id)
+            except Business.DoesNotExist:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'business': 'Business not found'})
+        else:
+            business = business_id
+        
+        serializer.save(user=self.request.user, business=business)
     
     @action(detail=False, methods=['post'])
     def calculate_score(self, request):
@@ -507,3 +737,106 @@ def dashboard_data(request):
     }
     
     return Response(dashboard_data)
+
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing suppliers"""
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Supplier.objects.none()
+        
+        business_id = self.request.query_params.get('business')
+        business_ids = list(get_business_queryset(user, business_id))
+        
+        if not business_ids:
+            return Supplier.objects.none()
+        
+        # Filter by business
+        qs = Supplier.objects.filter(business_id__in=business_ids)
+        
+        # If user is not superuser, filter by user or check membership role
+        if not user.is_superuser:
+            from users.views import user_is_business_admin
+            if business_id and user_is_business_admin(user, business_id):
+                # Business admin sees all suppliers in their business
+                pass
+            else:
+                # Staff sees only suppliers they created
+                qs = qs.filter(user=user)
+        
+        return qs.order_by('-created_at')
+    
+    def get_permissions(self):
+        # Allow list access for unauthenticated users (demo mode)
+        if self.action == 'list':
+            return [AllowAny()]
+        return super().get_permissions()
+    
+    def perform_create(self, serializer):
+        # Validate business exists and user has access
+        business_id = self.request.data.get('business')
+        if not business_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business ID is required'})
+        
+        # Convert to int for comparison
+        try:
+            business_id_int = int(business_id)
+        except (ValueError, TypeError):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Invalid business ID format'})
+        
+        business_ids = list(get_business_queryset(self.request.user, business_id_int))
+        if not business_ids or business_id_int not in business_ids:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You do not have access to this business')
+        
+        # Get Business object
+        from users.models import Business
+        try:
+            business = Business.objects.get(id=business_id_int)
+        except Business.DoesNotExist:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'business': 'Business not found'})
+        
+        serializer.save(user=self.request.user, business=business)
+
+
+class VoiceConversationViewSet(viewsets.ModelViewSet):
+    """ViewSet for storing voice conversation history"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Return empty queryset for now - conversations are stored client-side
+        return []
+    
+    def get_serializer_class(self):
+        # Simple serializer for accepting conversation data
+        from rest_framework import serializers
+        
+        class VoiceConversationSerializer(serializers.Serializer):
+            conversation_id = serializers.CharField(required=False)
+            messages = serializers.ListField(required=False)
+            timestamp = serializers.DateTimeField(required=False)
+            
+            class Meta:
+                fields = ['conversation_id', 'messages', 'timestamp']
+        
+        return VoiceConversationSerializer
+    
+    def create(self, request, *args, **kwargs):
+        # Accept the data but don't store it (client-side storage)
+        # Return success response
+        return Response({
+            'status': 'success',
+            'message': 'Conversation logged (client-side storage)'
+        }, status=status.HTTP_201_CREATED)
+    
+    def list(self, request, *args, **kwargs):
+        # Return empty list - conversations are client-side
+        return Response([])

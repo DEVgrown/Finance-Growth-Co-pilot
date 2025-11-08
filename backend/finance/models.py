@@ -354,3 +354,60 @@ class CreditScore(models.Model):
     
     def __str__(self):
         return f"Credit Score: {self.score} ({self.score_category})"
+
+
+class Supplier(models.Model):
+    """Supplier model for managing business suppliers"""
+    
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('preferred', 'Preferred'),
+        ('blocked', 'Blocked'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey('users.Business', on_delete=models.CASCADE, related_name='suppliers')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='suppliers')
+    
+    # Supplier details
+    supplier_name = models.CharField(max_length=255)
+    contact_person = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=20)
+    
+    # Address
+    address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, default='Kenya')
+    
+    # Business details
+    category = models.CharField(max_length=100, blank=True)
+    tax_id = models.CharField(max_length=100, blank=True)
+    registration_number = models.CharField(max_length=100, blank=True)
+    
+    # Status and rating
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    reliability_score = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True,
+                                           validators=[MinValueValidator(0), MaxValueValidator(10)])
+    
+    # Payment terms
+    payment_terms = models.CharField(max_length=100, blank=True)  # e.g., "Net 30", "COD"
+    credit_limit = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    
+    # Additional fields
+    notes = models.TextField(blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['business', 'status']),
+            models.Index(fields=['category', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.supplier_name} - {self.business.legal_name}"

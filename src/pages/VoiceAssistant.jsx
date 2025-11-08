@@ -7,7 +7,7 @@ import { buildFinancialContext, formatFinancialContext } from '../utils/financia
 import { connectToGemini } from '../services/geminiService';
 import { createBlob, decode, decodeAudioData } from '../services/audioUtils';
 import { streamTextToSpeech, playElevenLabsAudio, getElevenLabsVoices } from '../services/elevenLabsService';
-import { base44 } from '../api/base44Client';
+import base44 from '../api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -20,8 +20,10 @@ import {
 import VoiceWaveform from '../components/voice/VoiceWaveform';
 import ConversationHistory from '../components/voice/ConversationHistory';
 import QuickCommands from '../components/voice/QuickCommands';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function VoiceAssistant() {
+  const auth = useAuth();
   const {
     currentMode,
     isRecording,
@@ -151,9 +153,24 @@ export default function VoiceAssistant() {
   const loadFinancialContext = async () => {
     try {
       const context = await buildFinancialContext();
-      setFinancialContext(context);
+      
+      // Inject role and active business context from auth
+      const businesses = auth.getBusinesses();
+      const adminBiz = businesses.find(b => b.role === 'business_admin');
+      const activeBiz = adminBiz || businesses[0] || null;
+      const role = activeBiz ? activeBiz.role : null;
+      
+      const scoped = {
+        ...context,
+        business: activeBiz ? { business_name: activeBiz.name, id: activeBiz.id } : (context?.business || null),
+        user: auth.user || context?.user || null,
+        role,
+      };
+      
+      setFinancialContext(scoped);
+      console.log('✅ Kavi context updated');
     } catch (error) {
-      console.error('Error loading financial context:', error);
+      console.error('❌ Error loading financial context:', error);
     }
   };
 
@@ -211,6 +228,10 @@ export default function VoiceAssistant() {
 
   const startConversation = useCallback(async () => {
     if (useVoiceStore.getState().isRecording) return;
+
+    // Use cached financial context - no need to refresh every time
+    // Context is loaded on mount and can be manually refreshed if needed
+    console.log(' Using cached financial context for faster response');
 
     // Ensure there's a usable output AudioContext (create if closed)
     let { outputAudioContext } = useVoiceStore.getState();
@@ -1014,28 +1035,62 @@ export default function VoiceAssistant() {
           {financialContext && (
             <Card className="border-none shadow-lg">
               <CardHeader>
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Financial Status
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Financial Status
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={loadFinancialContext}
+                    className="h-8 w-8 p-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-3 text-sm">
+                <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <div className="text-xs text-gray-500 font-medium">Business: {financialContext.business?.business_name || financialContext.business?.legal_name || financialContext.business?.name}</div>
+                  <div className="text-xs text-gray-500">User: {financialContext.user?.full_name || financialContext.user?.first_name}</div>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">7 Day Income:</span>
+                  <span className="font-semibold text-green-600">
+                    KES {(financialContext.last7Days?.income || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">7 Day Expenses:</span>
+                  <span className="font-semibold text-red-600">
+                    KES {(financialContext.last7Days?.expenses || 0).toLocaleString()}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">7 Day Net:</span>
-                  <span className="font-semibold text-green-600">
-                    KES {financialContext.last7Days.net.toLocaleString()}
+                  <span className="font-semibold text-blue-600">
+                    KES {(financialContext.last7Days?.net || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">30 Day Net:</span>
                   <span className="font-semibold text-blue-600">
-                    KES {financialContext.last30Days.net.toLocaleString()}
+                    KES {(financialContext.last30Days?.net || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Overdue Invoices:</span>
                   <span className="font-semibold text-red-600">
-                    {financialContext.invoices.overdue}
+                    {financialContext.invoices?.overdue || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Transactions:</span>
+                  <span className="font-semibold">
+                    {financialContext.transactions?.total || 0}
                   </span>
                 </div>
               </CardContent>

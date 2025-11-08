@@ -22,10 +22,15 @@ export default function InvoiceForm({ invoice, onSubmit, onCancel, isSubmitting 
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    newItems[index][field] = value;
-
+    // Ensure numeric fields are properly converted
     if (field === 'quantity' || field === 'unit_price') {
-      newItems[index].total = (newItems[index].quantity || 0) * (newItems[index].unit_price || 0);
+      const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
+      newItems[index][field] = numValue;
+      const quantity = parseFloat(newItems[index].quantity) || 0;
+      const unitPrice = parseFloat(newItems[index].unit_price) || 0;
+      newItems[index].total = quantity * unitPrice;
+    } else {
+      newItems[index][field] = value;
     }
 
     setFormData({ ...formData, items: newItems });
@@ -59,7 +64,7 @@ export default function InvoiceForm({ invoice, onSubmit, onCancel, isSubmitting 
     onSubmit({
       ...formData,
       subtotal,
-      tax,
+      tax_amount: tax,
       total_amount: total
     });
   };
@@ -170,20 +175,27 @@ export default function InvoiceForm({ invoice, onSubmit, onCancel, isSubmitting 
                         <Input
                           type="number"
                           min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value))}
+                          value={item.quantity || ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            handleItemChange(index, 'quantity', val);
+                          }}
                         />
                       </TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.unit_price}
-                          onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value))}
+                          min="0"
+                          value={item.unit_price || ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            handleItemChange(index, 'unit_price', val);
+                          }}
                         />
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">KES {item.total.toFixed(2)}</span>
+                        <span className="font-medium">KES {(item.total || 0).toFixed(2)}</span>
                       </TableCell>
                       <TableCell>
                         <Button
@@ -241,7 +253,7 @@ export default function InvoiceForm({ invoice, onSubmit, onCancel, isSubmitting 
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Save className="w-4 h-4 mr-2" />
             {invoice ? 'Update' : 'Create'} Invoice
